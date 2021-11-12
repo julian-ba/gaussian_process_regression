@@ -1,6 +1,6 @@
 import core
-import simulateddata as sd
+import simulated_data as sd
 from core import *
-import plotfunctions as plot
+import plot_functions as plot
 
-print(SpatialPointVector(np.arange(100)))
+plot.pos_plot(sd.smooth_data(100, [1, 1], [1, 1], 2), True)
