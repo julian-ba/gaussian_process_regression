@@ -3,4 +3,5 @@ import simulated_data as sd
 from core import *
 import plot_functions as plot
 
-plot.pos_plot(sd.smooth_data(100, [1, 1], [1, 1], 2), True)
+print(create_dataframe(sd.jagged_data(n=100)))
+
