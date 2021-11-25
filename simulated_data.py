@@ -5,7 +5,7 @@ import numbers
 
 
 def smooth_data(n, loc=0., scale=1., dim=None):
-    # Returns n sample points as a SpatialPointVector from a 3-variate Gaussian distribution distributed according to.
+    # Returns n sample points from a multivariate Gaussian distribution distributed according to.
     # The distributions in each dimension are independent.
     if dim is None:
         if isinstance(loc, numbers.Number):
@@ -46,7 +46,7 @@ def smooth_data(n, loc=0., scale=1., dim=None):
 
 
 def jagged_data(n, loc=0., scale=1, dim=None):
-    # Generates n points uniformly distributed over a cuboid. loc is the lower bound of the distribution (resp.
+    # Generates n points uniformly distributed over a hyper-cuboid. loc is the lower bound of the distribution (resp.
     # dimension), loc+scale is the upper bound.
     if dim is None:
         if isinstance(loc, numbers.Number):

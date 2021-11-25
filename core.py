@@ -4,6 +4,7 @@ import pandas as pd
 
 
 def create_dataframe(array, n_val=0, value_names=None, do_binarize=False, return_spatial_dim=False):
+    # Creates a pandas DataFrame, mainly for visualization purposes.
     init_dict = {}
     arr = array
 
