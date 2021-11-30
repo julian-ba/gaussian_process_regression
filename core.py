@@ -1,4 +1,4 @@
-# File containing the core classes used in project, most notably SpatialPointVector.
+# TODO: Create function which returns a list of the coordinates of a grid.
 import numpy as np
 import pandas as pd
 
