@@ -50,3 +50,18 @@ def create_dataframe(array, n_val=0, value_names=None, do_binarize=False, return
     else:
         return pd.DataFrame(init_dict)
 
+
+def atleast_column(v):
+    # Convenience function
+    if v.ndim == 1:
+        v = v[:, np.newaxis]
+
+    return v
+
+
+def to_points(array):
+    # Flattens an array; each row of the resulting array is the vector resulting from specifying only the first
+    # array.ndim - 1 dimensions.
+    number_of_points = array.size // array.shape[-1]
+    point_array = np.reshape(array, (number_of_points, array.shape[-1]), order="C")
+    return point_array
