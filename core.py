@@ -55,7 +55,6 @@ def atleast_column(v):
     # Convenience function
     if v.ndim == 1:
         v = v[:, np.newaxis]
-
     return v
 
 
