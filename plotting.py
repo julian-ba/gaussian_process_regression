@@ -7,20 +7,24 @@ from core import *
 
 
 def data_plot(ax, x, fx):
-    out = ax.scatter(x, fx, c="k", marker="x")
-    return out
+    ax.scatter(x, fx, c="k", marker="x")
 
 
 def model_plot(ax, model, interval):
-    plot_points = atleast_column(np.linspace(interval[0], interval[1], 100))
+    plot_points = atleast_column(np.linspace(interval[0], interval[1], 1000))
     mean_at_plot_points, var_at_plot_points = model.predict_f(plot_points)
-    out = ax.plot(plot_points, mean_at_plot_points, "C0", lw=2)
-    print(out)
-    out = ax.fill_between(
+    ax.plot(plot_points, mean_at_plot_points, "C0", lw=2)
+    ax.fill_between(
         plot_points[:, 0],
         mean_at_plot_points[:, 0] - 1.96 * np.sqrt(var_at_plot_points[:, 0]),
         mean_at_plot_points[:, 0] + 1.96 * np.sqrt(var_at_plot_points[:, 0]),
         color="C0",
         alpha=0.2
     )
-    return out
+
+
+def sample_f_plot(ax, model, interval, n=10):
+    plot_points = atleast_column(np.linspace(interval[0], interval[1], 1000))
+    sampled_functions = model.predict_f_samples(plot_points, n)
+    for sampled_function in sampled_functions:
+        ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
