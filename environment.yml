@@ -1,0 +1,9 @@
+name: gpr-gpflow
+dependencies:
+  - python
+  - numpy
+  - matplotlib
+  - pip
+  - pip:
+    - tensorflow
+    - gpflow
