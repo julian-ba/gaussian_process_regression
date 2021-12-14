@@ -2,7 +2,6 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 from core import *
 
 
@@ -10,8 +9,8 @@ def data_plot(ax, x, fx):
     ax.scatter(x, fx, c="k", marker="x")
 
 
-def model_plot(ax, model, interval):
-    plot_points = atleast_column(np.linspace(interval[0], interval[1], 1000))
+def model_plot(ax, model, lower, upper):
+    plot_points = atleast_column(np.linspace(lower, upper, 1000))
     mean_at_plot_points, var_at_plot_points = model.predict_f(plot_points)
     ax.plot(plot_points, mean_at_plot_points, "C0", lw=2)
     ax.fill_between(
@@ -23,8 +22,8 @@ def model_plot(ax, model, interval):
     )
 
 
-def sample_f_plot(ax, model, interval, n=10):
-    plot_points = atleast_column(np.linspace(interval[0], interval[1], 1000))
+def sample_f_plot_1d(ax, model, lower, upper, n=10):
+    plot_points = atleast_column(np.linspace(lower, upper, 1000))
     sampled_functions = model.predict_f_samples(plot_points, n)
     for sampled_function in sampled_functions:
         ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
