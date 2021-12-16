@@ -1,15 +1,22 @@
 import numpy as np
 import os
-import tensorflow as tf
 import matplotlib.pyplot as plt
+import simulated_data as sd
+import plotting
 import timing
 from core import *
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+x = np.linspace(0, 10, 11)
+y = np.linspace(0, 10, 11)
 
-tested_n, result_array = timing.run_1d_test(10, 1, 10001, 100, return_seconds=True)
+xy = coord_list(x, y)
 
-plt.plot(tested_n, result_array)
-plt.ylabel("Mean time taken in seconds")
-plt.xlabel("n")
-plt.savefig("Without GPU.png")
+fx = sd.jagged_data(121)
+
+m = rbf_regression(xy, fx, lengthscales=0.5)
+
+fig = plt.figure()
+ax = plt.axes(projection="3d")
+
+plotting.model_plot_2d(ax, m, 0, 10)
+plt.show()

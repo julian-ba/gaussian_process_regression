@@ -2,13 +2,14 @@
 
 import numpy as np
 from core import *
+import matplotlib.pyplot as plt
 
 
 def data_plot(ax, x, fx):
     ax.scatter(x, fx, c="k", marker="x")
 
 
-def model_plot(ax, model, lower, upper):
+def model_plot_1d(ax, model, lower, upper):
     plot_points = atleast_column(np.linspace(lower, upper, 1000))
     mean_at_plot_points, var_at_plot_points = model.predict_f(plot_points)
     ax.plot(plot_points, mean_at_plot_points, "C0", lw=2)
@@ -21,13 +22,29 @@ def model_plot(ax, model, lower, upper):
     )
 
 
+def model_plot_2d(ax, model, lower, upper):
+    if not hasattr(lower, "__getitem__"):
+        lower = [lower, lower]
+
+    if not hasattr(upper, "__getitem__"):
+        upper = [upper, upper]
+
+    x = np.linspace(lower[0], upper[0], 100)
+    y = np.linspace(lower[1], upper[1], 100)
+
+    test_points, (xx, yy) = coord_list_and_meshgrid(x, y)
+
+    sampled_function_mean, sampled_function_var = model.predict_f(test_points)
+    sampled_function_mean = sampled_function_mean.numpy().reshape(len(y), len(x))
+    sampled_function_sig = np.sqrt(sampled_function_var.numpy().reshape(len(y), len(x)))
+    print(sampled_function_sig)
+    ax.plot_surface(xx, yy, sampled_function_mean, cmap=plt.cm.cividis)
+    ax.plot_wireframe(xx, yy, sampled_function_mean+1.96*sampled_function_sig)
+    ax.plot_wireframe(xx, yy, sampled_function_mean-1.96*sampled_function_sig)
+
+
 def sample_f_plot_1d(ax, model, lower, upper, n=10):
     plot_points = atleast_column(np.linspace(lower, upper, 1000))
     sampled_functions = model.predict_f_samples(plot_points, n)
     for sampled_function in sampled_functions:
         ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
-
-
-def sample_f_plot_2d(ax, model, lower, upper):
-    xx, yy = np.meshgrid(np.linspace(lower[0], upper[0], 1000), np.linspace(lower[1], upper[1], 1000))
-    sampled_function = model.predict_f_samples(xx)
