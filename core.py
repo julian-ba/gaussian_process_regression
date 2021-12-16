@@ -1,6 +1,7 @@
 # TODO: Create function which returns a list of the coordinates of a grid.
 import numpy as np
 import gpflow as gpf
+import numbers
 
 
 def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
@@ -25,3 +26,21 @@ def atleast_column(x):
         raise TypeError("The input must be a NumPy-array.")
 
     return output_array
+
+
+def coordinate_list(lower, upper, dim, n_per_dimension):
+    if isinstance(lower, numbers.Number):
+        lower = [lower for i in range(dim)]
+
+    if isinstance(upper, numbers.Number):
+        upper = [upper for i in range(dim)]
+
+    if isinstance(n_per_dimension, numbers.Number):
+        n_per_dimension = [n_per_dimension for i in range(dim)]
+
+    list_of_axes = []
+    for i in range(dim):
+        list_of_axes.append(np.linspace(lower[0], upper[0], n_per_dimension[0]))
+
+    coord_grids = np.meshgrid(*list_of_axes)
+
