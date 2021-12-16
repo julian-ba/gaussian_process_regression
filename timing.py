@@ -8,20 +8,24 @@ def time_model(
         repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=rbf_regression, **kwargs
 ):
     # Create repetitions-# of model_type of data x and return the time in ns or s taken for each resp. repetition.
-    model_type(x=np.array([[0]]), fx=np.array([[1]]))  # Starts TensorFlow
+    model_type(x=np.array([[0]]), fx=np.array([[1]]))  # Should start TensorFlow
+    testing_points = x + 0.5
     output_array = np.empty(repetitions)
     if callable(fx):
         n = x.shape[0]
         for repetition_idx in range(repetitions):
             data = atleast_column(fx(n=n, **kwargs))
             t1 = time.time_ns()
-            model_type(x=x, fx=data, **kwargs)
+            m = model_type(x=x, fx=data, **kwargs)
+            m.predict_f(testing_points)
             t2 = time.time_ns()
+            del m
             output_array[repetition_idx] = t2 - t1
     else:
         for repetition_idx in range(repetitions):
             t1 = time.thread_time_ns()
-            model_type(x=x, fx=fx, **kwargs)
+            m = model_type(x=x, fx=fx, **kwargs)
+            m.predict_f_samples(testing_points)
             t2 = time.thread_time_ns()
             output_array[repetition_idx] = t2 - t1
 
@@ -36,7 +40,7 @@ def run_1d_test(repetitions, lower_n, upper_n, step=1, *args, **kwargs):
     data_array = np.empty((len(tested_n), repetitions))
     idx = 0
     for i in tested_n:
-        x = np.linspace(0, 10, i)
+        x = atleast_column(np.linspace(0, 10, i))
         data_array[idx] = time_model(repetitions=repetitions, x=x, *args, **kwargs)
         idx += 1
 

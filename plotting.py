@@ -1,6 +1,5 @@
 # Plotting functions for GPR such as plotting distribution parameters from GPR over 1-d and 2-d data
 
-import matplotlib.pyplot as plt
 import numpy as np
 from core import *
 
@@ -27,3 +26,8 @@ def sample_f_plot_1d(ax, model, lower, upper, n=10):
     sampled_functions = model.predict_f_samples(plot_points, n)
     for sampled_function in sampled_functions:
         ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
+
+
+def sample_f_plot_2d(ax, model, lower, upper):
+    xx, yy = np.meshgrid(np.linspace(lower[0], upper[0], 1000), np.linspace(lower[1], upper[1], 1000))
+    sampled_function = model.predict_f_samples(xx)
