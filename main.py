@@ -1,8 +1,8 @@
 import numpy as np
 from core import *
 
-print(coord_list(np.linspace(0, 1, 11), np.linspace(0, 10, 11), np.linspace(0, 100, 11)))
+space = np.arange(1000).reshape((10, 10, 10))
 
-space = np.zeros((11, 11, 11))
-space[6, 7, 8] = 1
-print(np.argwhere(space == 1))
+print(space[5][2][1])
+
+print(coord_list(100*np.arange(10), 10*np.arange(10), np.arange(10))[521])

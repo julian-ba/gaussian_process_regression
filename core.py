@@ -20,13 +20,13 @@ def atleast_column(x):
 
 
 def coord_list(*xi):
-    # TODO: Verify correct functionality
-    coord_grid = np.reshape(np.stack(np.meshgrid(*xi), axis=-1), (-1, len(xi)), order="C")
+    # TODO: improve; seems hacky
+    coord_grid = np.reshape(np.stack(np.meshgrid(*xi, indexing="ij"), axis=-1), (-1, len(xi)), order="C")
     return coord_grid
 
 
 def coord_list_and_meshgrid(*xi):
-    meshxi = np.meshgrid(*xi)
+    meshxi = np.meshgrid(*xi, indexing="ij")
     coord_grid = np.reshape(np.stack(meshxi, axis=-1), (-1, len(xi)), order="C")
     return coord_grid, meshxi
 
@@ -38,6 +38,6 @@ def sparsify(fx, threshold, *xis):
     if xis == ():
         sparse_coords = np.mgrid[indices]
     else:
-        sparse_coords = np.stack(np.meshgrid(*xis), axis=-1)[indices]
+        sparse_coords = np.stack(np.meshgrid(*xis, indexing="ij"), axis=-1)[indices]
 
     return sparse_coords, sparse_fx
