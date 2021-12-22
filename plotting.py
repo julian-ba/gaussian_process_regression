@@ -35,8 +35,8 @@ def model_plot_2d(ax1, ax2, model, lower, upper):
     plot_points, (xx, yy) = coord_list_and_meshgrid(x+0.5, y+0.5)
 
     sampled_function_mean, sampled_function_var = model.predict_f(plot_points)
-    sampled_function_mean = from_list_to_array(sampled_function_mean.numpy(), len(x), len(y))
-    sampled_function_var = from_list_to_array(sampled_function_var.numpy(), len(x), len(y))
+    sampled_function_mean = sampled_function_mean.numpy().reshape(len(x), len(y))
+    sampled_function_var = sampled_function_var.numpy().reshape(len(x), len(y))
     ax1.pcolormesh(xx, yy, sampled_function_mean)
     ax2.pcolormesh(xx, yy, sampled_function_var)
 
@@ -61,5 +61,5 @@ def sample_f_plot_2d(ax, model, lower, upper):
     plot_points, (xx, yy) = coord_list_and_meshgrid(x, y)
 
     sampled_func = model.predict_f_samples(plot_points)
-    sampled_func = from_list_to_array(sampled_func.numpy(), x, y)
+    sampled_func = sampled_func.numpy().reshape(x, y)
     ax.plot_surface(xx, yy, sampled_func)
