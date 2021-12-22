@@ -2,10 +2,11 @@ from core import *
 import time
 import numpy as np
 import simulated_data as sd
+import gaussian_process_functions as gpf
 
 
 def time_model_1d(
-        repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=rbf_regression, **kwargs
+        repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=gpf.rbf_regression, **kwargs
 ):
     # Create repetitions-# of model_type of data x and return the time in ns or s taken for each resp. repetition.
     model_type(x=np.array([[0]]), fx=np.array([[1]]))  # Should start TensorFlow
