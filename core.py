@@ -3,7 +3,6 @@ import numpy as np
 
 
 def atleast_column(x):
-
     try:
         x = np.asarray(x)
         if x.ndim == 1:
@@ -20,7 +19,6 @@ def atleast_column(x):
 
 
 def coord_list(*xi):
-    # TODO: improve; seems hacky
     coord_grid = np.reshape(np.stack(np.meshgrid(*xi, indexing="ij"), axis=-1), (-1, len(xi)), order="C")
     return coord_grid
 
