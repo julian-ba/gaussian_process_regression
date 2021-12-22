@@ -4,6 +4,8 @@ dependencies:
   - numpy
   - matplotlib
   - pip
+  - scikit-learn
+  - scikit-image
   - pip:
     - tensorflow
     - gpflow

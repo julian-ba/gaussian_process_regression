@@ -5,7 +5,7 @@ from core import *
 import matplotlib.pyplot as plt
 
 
-def data_plot(ax, x, fx):
+def data_plot_1d(ax, x, fx):
     ax.scatter(x, fx, c="k", marker="x")
 
 
@@ -22,7 +22,7 @@ def model_plot_1d(ax, model, lower, upper):
     )
 
 
-def model_plot_2d(ax, model, lower, upper):
+def model_plot_2d(ax1, ax2, model, lower, upper):
     if not hasattr(lower, "__getitem__"):
         lower = [lower, lower]
 
@@ -32,15 +32,13 @@ def model_plot_2d(ax, model, lower, upper):
     x = np.linspace(lower[0], upper[0], 100)
     y = np.linspace(lower[1], upper[1], 100)
 
-    test_points, (xx, yy) = coord_list_and_meshgrid(x, y)
+    plot_points, (xx, yy) = coord_list_and_meshgrid(x+0.5, y+0.5)
 
-    sampled_function_mean, sampled_function_var = model.predict_f(test_points)
-    sampled_function_mean = sampled_function_mean.numpy().reshape(len(y), len(x))
-    sampled_function_sig = np.sqrt(sampled_function_var.numpy().reshape(len(y), len(x)))
-    print(sampled_function_sig)
-    ax.plot_surface(xx, yy, sampled_function_mean, cmap=plt.cm.cividis)
-    ax.plot_wireframe(xx, yy, sampled_function_mean+1.96*sampled_function_sig)
-    ax.plot_wireframe(xx, yy, sampled_function_mean-1.96*sampled_function_sig)
+    sampled_function_mean, sampled_function_var = model.predict_f(plot_points)
+    sampled_function_mean = from_list_to_array(sampled_function_mean.numpy(), len(x), len(y))
+    sampled_function_var = from_list_to_array(sampled_function_var.numpy(), len(x), len(y))
+    ax1.pcolormesh(xx, yy, sampled_function_mean)
+    ax2.pcolormesh(xx, yy, sampled_function_var)
 
 
 def sample_f_plot_1d(ax, model, lower, upper, n=10):
@@ -48,3 +46,20 @@ def sample_f_plot_1d(ax, model, lower, upper, n=10):
     sampled_functions = model.predict_f_samples(plot_points, n)
     for sampled_function in sampled_functions:
         ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
+
+
+def sample_f_plot_2d(ax, model, lower, upper):
+    if not hasattr(lower, "__getitem__"):
+        lower = [lower, lower]
+
+    if not hasattr(upper, "__getitem__"):
+        upper = [upper, upper]
+
+    x = np.linspace(lower[0], upper[0], 100)
+    y = np.linspace(lower[1], upper[1], 100)
+
+    plot_points, (xx, yy) = coord_list_and_meshgrid(x, y)
+
+    sampled_func = model.predict_f_samples(plot_points)
+    sampled_func = from_list_to_array(sampled_func.numpy(), x, y)
+    ax.plot_surface(xx, yy, sampled_func)
