@@ -3,7 +3,6 @@ import time
 import numpy as np
 import simulated_data as sd
 import gaussian_process_functions as gpf
-from sklearn import
 
 
 def time_model_1d(
@@ -18,7 +17,7 @@ def time_model_1d(
     if callable(fx):
         n = x.shape[0]
         for repetition_idx in range(repetitions):
-            data = atleast_column(fx(n=n, **kwargs))
+            data = exactly_2d(fx(n=n, **kwargs))
             t1 = time.time_ns()
             m = model_type(x=x, fx=data, **kwargs)
             m.predict_f(testing_points)
@@ -44,7 +43,7 @@ def run_test_1d(repetitions, lower_n, upper_n, step=1, *args, **kwargs):
     data_array = np.empty((len(tested_n), repetitions))
     idx = 0
     for i in tested_n:
-        x = atleast_column(np.linspace(0, 10, i))
+        x = exactly_2d(np.linspace(0, 10, i))
         data_array[idx] = time_model_1d(repetitions=repetitions, x=x, *args, **kwargs)
         idx += 1
 

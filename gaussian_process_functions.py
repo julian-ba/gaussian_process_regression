@@ -4,8 +4,8 @@ import gpflow as gpf
 
 
 def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
-    x = atleast_column(x=x)
-    fx = atleast_column(x=fx)
+    x = exactly_2d(x=x)
+    fx = exactly_2d(x=fx)
 
     if noise_value is None:
         noise_value = max(np.abs(fx))[0] * 0.2
