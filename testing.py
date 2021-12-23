@@ -3,6 +3,7 @@ import time
 import numpy as np
 import simulated_data as sd
 import gaussian_process_functions as gpf
+from sklearn import
 
 
 def time_model_1d(
