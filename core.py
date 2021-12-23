@@ -15,27 +15,28 @@ def atleast_column(x):
     return output_array
 
 
-# def flatten_values(x, output_dim=1):
-
-
-def coord_list(*xi):
-    coord_grid = np.reshape(np.stack(np.meshgrid(*xi, indexing="ij"), axis=-1), (-1, len(xi)), order="C")
-    return coord_grid
-
-
 def coord_list_and_meshgrid(*xi):
     meshxi = np.meshgrid(*xi, indexing="ij")
     coord_grid = np.reshape(np.stack(meshxi, axis=-1), (-1, len(xi)), order="C")
     return coord_grid, meshxi
 
 
+def coord_list(*xi):
+    return coord_list_and_meshgrid(*xi)[0]
+
+
 def sparsify(fx, threshold, *xis):
     # From an array, return a list of coordinates, and a list of values corresponding to the coordinates.
     indices = np.nonzero(fx >= threshold)
     sparse_fx = atleast_column(fx[indices])
+    mgrid_specifier = tuple([slice(0, i) for i in fx.shape])
     if xis == ():
-        sparse_coords = np.mgrid[indices]
+        ndim = fx.ndim
+        permutation = list(range(1, ndim+1))
+        permutation.append(0)
+        sparse_coords = np.mgrid[mgrid_specifier].transpose(permutation)[indices]
     else:
         sparse_coords = np.stack(np.meshgrid(*xis, indexing="ij"), axis=-1)[indices]
 
     return sparse_coords, sparse_fx
+
