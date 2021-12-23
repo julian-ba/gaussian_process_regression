@@ -10,7 +10,7 @@ def data_plot_1d(ax, x, fx):
 
 
 def model_plot_1d(ax, model, lower, upper):
-    plot_points = atleast_column(np.linspace(lower, upper, 1000))
+    plot_points = exactly_2d(np.linspace(lower, upper, 1000))
     mean_at_plot_points, var_at_plot_points = model.predict_f(plot_points)
     ax.plot(plot_points, mean_at_plot_points, "C0", lw=2)
     ax.fill_between(
@@ -42,7 +42,7 @@ def model_plot_2d(ax1, ax2, model, lower, upper):
 
 
 def sample_f_plot_1d(ax, model, lower, upper, n=10):
-    plot_points = atleast_column(np.linspace(lower, upper, 1000))
+    plot_points = exactly_2d(np.linspace(lower, upper, 1000))
     sampled_functions = model.predict_f_samples(plot_points, n)
     for sampled_function in sampled_functions:
         ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
