@@ -5,7 +5,7 @@ import numbers
 
 
 def smooth_data(n, loc=0., scale=1., dim=None):
-    # Returns n sample points from a multivariate Gaussian distribution distributed according to.
+    # Returns n sample points from a multivariate Gaussian distribution distributed according to loc and scale.
     # The distributions in each dimension are independent.
     if dim is None:
         if isinstance(loc, numbers.Number):

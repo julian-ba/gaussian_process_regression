@@ -4,15 +4,14 @@ import numbers
 
 
 def exactly_2d(x):
+    # Warning: This function does not necessarily behave as expected with arrays of dimension greater than 2. In this
+    # case, it should only be used carefully.
     if x.ndim <= 1:
         output_array = np.atleast_2d(x).T
     elif x.ndim == 2:
         output_array = x
     else:
-        dim = x.shape[1]
-        output_array = np.empty_like(x).reshape(-1, dim)
-        for j in range(dim):
-            output_array[:, j] = x[:, j, ...].flatten()
+        output_array = x.reshape((-1, x.shape[-1]))
     return output_array
 
 
@@ -26,9 +25,16 @@ def coord_list(*xi):
     return coord_list_and_meshgrid(*xi)[0]
 
 
-def coord_list_evenly_spaced(*upper_bound):
-    xi = [np.arange(i) for i in upper_bound]
-    return coord_list(*xi)
+def slices_to_coord_list(*slices):
+    ndim = len(slices)
+    cyclic_permutation = list(range(1, ndim + 1))
+    cyclic_permutation.append(0)
+    return np.mgrid[slices].transpose(cyclic_permutation).reshape((-1, ndim))
+
+
+def index_list(shape):
+    mgrid_specifier = [slice(0, i) for i in shape]
+    return slices_to_coord_list(*mgrid_specifier)
 
 
 def sparsify(fx, threshold, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float), *xis):
@@ -36,8 +42,8 @@ def sparsify(fx, threshold, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx
     # values are greater than threshold.
     indices = np.nonzero(fx >= threshold)
     sparse_fx = exactly_2d(fx[indices])
-    mgrid_specifier = tuple([slice(0, i) for i in fx.shape])
     if xis == ():
+        mgrid_specifier = tuple([slice(0, i) for i in fx.shape])
         ndim = fx.ndim
         cyclic_permutation = list(range(1, ndim+1))
         cyclic_permutation.append(0)
@@ -53,3 +59,27 @@ def sparsify(fx, threshold, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx
 
     return sparse_coords, sparse_fx
 
+
+def subdivided_array_slices(array, step_size=10):
+    ndim = array.ndim
+    shape = array.shape
+    step_size = np.broadcast_to(step_size, (ndim,))
+
+    q, r = np.divmod(shape, step_size)
+
+    index_lookup_table = []
+
+    index_lookup_table_lengths_minus_1 = []
+
+    for i in range(ndim):
+        index_lookup_table.append(np.arange(q[i]+1) * step_size[i])
+        if r[i] != 0:
+            index_lookup_table[i] = np.append(index_lookup_table[i], shape[i])
+
+        index_lookup_table_lengths_minus_1.append(len(index_lookup_table[i]) - 1)
+
+    indices = index_list(index_lookup_table_lengths_minus_1) + 1
+
+    return [tuple(
+        [slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)]
+    ) for i in indices]
