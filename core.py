@@ -6,6 +6,7 @@ import numbers
 def exactly_2d(x):
     # Warning: This function does not necessarily behave as expected with arrays of dimension greater than 2. In this
     # case, it should only be used carefully.
+    x = np.asarray(x)
     if x.ndim <= 1:
         output_array = np.atleast_2d(x).T
     elif x.ndim == 2:
@@ -83,3 +84,21 @@ def subdivided_array_slices(array, step_size=10):
     return [tuple(
         [slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)]
     ) for i in indices]
+
+
+def euclidean_distance(x, y):
+    return np.sqrt(np.sum(np.square(x - y)))
+
+
+def euclidean_norm(x):
+    return euclidean_distance(x, x)
+
+
+def to_radial_function(function):
+
+    def radial_function(x):
+        return function(euclidean_norm(x))
+
+    return radial_function
+
+

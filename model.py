@@ -3,7 +3,7 @@ from core import *
 
 
 class DataSet:
-    methods = ("gpr", "kde", "classic")
+    methods = {"gpr", "kde", "classic"}
 
     def replace_data(self, x=None, fx=None):
         if x is not None:
@@ -32,6 +32,9 @@ class DataSet:
     def __iter__(self):
         self.i = 0
         return self
+
+    def __call__(self):
+        return {"x": self.x, "fx": self.fx}
 
     def __next__(self):
         if self.i < self.n:
