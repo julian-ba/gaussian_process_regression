@@ -1,6 +1,5 @@
 # Convenience functions
 import numpy as np
-import numbers
 
 
 def exactly_2d(x):
@@ -16,41 +15,40 @@ def exactly_2d(x):
     return output_array
 
 
-def coord_list_and_meshgrid(*xi):
-    meshxi = np.meshgrid(*xi, indexing="ij")
-    coord_grid = np.reshape(np.stack(meshxi, axis=-1), (-1, len(xi)), order="C")
-    return coord_grid, meshxi
+def coord_array(*xi):
+    return np.stack(np.meshgrid(*xi, indexing="ij"), axis=-1)
 
 
-def coord_list(*xi):
-    return coord_list_and_meshgrid(*xi)[0]
-
-
-def slices_to_coord_list(*slices):
+def index_array(*slices):
     ndim = len(slices)
     cyclic_permutation = list(range(1, ndim + 1))
     cyclic_permutation.append(0)
-    return np.mgrid[slices].transpose(cyclic_permutation).reshape((-1, ndim))
+    return np.mgrid[slices].transpose(cyclic_permutation)
 
 
-def index_list(shape):
-    mgrid_specifier = [slice(0, i) for i in shape]
-    return slices_to_coord_list(*mgrid_specifier)
+def coord_or_index_array(*xi_or_slice):
+    if all((isinstance(i, slice) for i in xi_or_slice)):
+        return index_array(*xi_or_slice)
+    elif all((isinstance(i, np.ndarray) for i in xi_or_slice)):
+        return coord_array(*xi_or_slice)
+    else:
+        raise ValueError("The only allowed arguments are tuples of NumPy arrays or slices.")
 
 
-def sparsify(fx, threshold, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float), *xis):
+def coord_or_index_list(*xi_or_slice):
+    return coord_or_index_array(*xi_or_slice).reshape((-1, len(xi_or_slice)))
+
+
+def sparsify(fx, threshold, *xi_or_slice, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float)):
     # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
     # values are greater than threshold.
     indices = np.nonzero(fx >= threshold)
     sparse_fx = exactly_2d(fx[indices])
-    if xis == ():
-        mgrid_specifier = tuple([slice(0, i) for i in fx.shape])
-        ndim = fx.ndim
-        cyclic_permutation = list(range(1, ndim+1))
-        cyclic_permutation.append(0)
-        sparse_coords = np.mgrid[mgrid_specifier].transpose(cyclic_permutation)[indices]
-    else:
-        sparse_coords = np.stack(np.meshgrid(*xis, indexing="ij"), axis=-1)[indices]
+    if xi_or_slice == ():
+        xi_or_slice = (slice(0, i) for i in fx.shape)
+
+    coordinate_array = coord_or_index_array(*xi_or_slice)
+    sparse_coords = coordinate_array[indices]
 
     if dtype_sparse_coords is not None:
         sparse_coords = sparse_coords.astype(dtype_sparse_coords)
@@ -64,26 +62,24 @@ def sparsify(fx, threshold, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx
 def subdivided_array_slices(array, step_size=10):
     ndim = array.ndim
     shape = array.shape
-    step_size = np.broadcast_to(step_size, (ndim,))
+    step_size, shape = np.broadcast_arrays(step_size, shape)
 
     q, r = np.divmod(shape, step_size)
 
     index_lookup_table = []
 
-    index_lookup_table_lengths_minus_1 = []
+    index_lookup_table_bounds_minus_1 = []
 
     for i in range(ndim):
         index_lookup_table.append(np.arange(q[i]+1) * step_size[i])
         if r[i] != 0:
             index_lookup_table[i] = np.append(index_lookup_table[i], shape[i])
 
-        index_lookup_table_lengths_minus_1.append(len(index_lookup_table[i]) - 1)
+        index_lookup_table_bounds_minus_1.append(slice(0, len(index_lookup_table[i]) - 1))
 
-    indices = index_list(index_lookup_table_lengths_minus_1) + 1
+    indices = coord_or_index_list(*index_lookup_table_bounds_minus_1) + 1
 
-    return [tuple(
-        [slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)]
-    ) for i in indices]
+    return (tuple(slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)) for i in indices)
 
 
 def euclidean_distance(x, y):

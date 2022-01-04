@@ -2,7 +2,7 @@ from core import *
 import time
 import numpy as np
 import simulated_data as sd
-import gaussian_process_functions as gpf
+import gaussian_process_regression as gpf
 
 
 def time_model_1d(

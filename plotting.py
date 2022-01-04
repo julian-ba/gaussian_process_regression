@@ -5,6 +5,12 @@ from core import *
 import matplotlib.pyplot as plt
 
 
+def coord_list_and_meshgrid(*xi):
+    meshxi = np.meshgrid(*xi, indexing="xy")
+    coord_grid = np.reshape(coord_array(*xi), (-1, len(xi)), order="C")
+    return coord_grid, meshxi
+
+
 def data_plot_1d(ax, x, fx):
     ax.scatter(x, fx, c="k", marker="x")
 

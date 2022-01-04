@@ -8,7 +8,7 @@ def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
     fx = exactly_2d(x=fx)
 
     if noise_value is None:
-        noise_value = max(np.abs(fx))[0] * 0.2
+        noise_value = np.amax(np.abs(fx), initial=0.001) * 0.2
     rbf_model = gpf.models.GPR(
         data=(x, fx),
         kernel=gpf.kernels.stationaries.SquaredExponential(variance=variance, lengthscales=lengthscales),
