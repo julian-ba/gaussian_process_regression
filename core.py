@@ -79,7 +79,9 @@ def subdivided_array_slices(array, step_size=10):
 
     indices = coord_or_index_list(*index_lookup_table_bounds_minus_1) + 1
 
-    return (tuple(slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)) for i in indices)
+    return tuple(
+        tuple(slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)) for i in indices
+    )
 
 
 def euclidean_distance(x, y):
