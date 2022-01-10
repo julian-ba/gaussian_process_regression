@@ -1,15 +1,12 @@
-import gpflow.utilities
-
 from core import *
 import image_processing
 from skimage import io
-import tifffile
-import gaussian_process_regression as gpf
-import gpflow
+import gaussian_process_regression as gpr
 import numpy as np
+import kernel_density_estimation as kde
 
 
-def tif_pipeline_gpr(fname_in, fname_out):
+def tif_pipeline_gpr(fname_in, fname_out_mean, fname_out_var):
     # from core import *
     # from skimage import io
     # import gaussian_process_functions as gpf
@@ -19,8 +16,10 @@ def tif_pipeline_gpr(fname_in, fname_out):
 
     mean = np.empty_like(image)
 
-    lengthscale = 5
+    lengthscale = 10
     threshold = 0.05
+    noise = np.amax(image) * 0.2
+    var = np.full_like(image, noise)
 
     for i in subdivided_array_slices(image, step_size=30):  # Subdivide image into parts; we create a model for each
         # part due to memory constraints.
@@ -46,11 +45,40 @@ def tif_pipeline_gpr(fname_in, fname_out):
         if x.size == 0:  # If there are no points, we simply set mean[i] to be 0 everywhere
             mean[i] = np.zeros_like(mean[i])
         else:  # Otherwise, we generate a model using x, fx
-            model = gpf.rbf_regression(x=x, fx=fx, lengthscales=lengthscale)
+            model = gpr.rbf_regression(x=x, fx=fx, lengthscales=lengthscale, noise_value=noise)
             grid_coord_list = coord_or_index_list(*i).astype(np.dtype(float))
-            mean_part = model.predict_f(grid_coord_list)[0].numpy().reshape(shape_of_image_part)
+            mean_part, var_part = model.predict_f(grid_coord_list)
+            mean_part = mean_part.numpy().reshape(shape_of_image_part)
+            var_part = var_part.numpy().reshape(shape_of_image_part)
             mean[i] = mean_part
+            var[i] = var_part
 
     mean *= 255 / np.amax(mean)  # Scale mean to show more contrast.
-    tifffile.imsave(fname_out, mean.astype("uint8"))  # Save image
+    var *= 255 / np.amax(var)  # Scale var to show more contrast.
+    io.imsave(fname_out_mean, mean.astype("uint8"))  # Save mean
+    io.imsave(fname_out_var, var.astype("uint8"))  # Save var
 
+
+def tif_pipeline_kde(fname_in, fname_out):
+    # from core import *
+    # from skimage import io
+    # import kernel_density_estimation as kde
+    # import image_processing
+
+    image = image_processing.import_tif_file(fname=fname_in)
+
+    estimated = np.empty_like(image)
+
+    threshold = 0.05
+    lengthscale = 10
+    x, fx = sparsify(image, threshold)
+    bandwidth = kde.bandwidth_rule_of_thumb(len(fx), lengthscale)
+
+    estimator = np.frompyfunc(
+        kde.kernel_density_estimator(x, bandwidth, kde.to_radial_function(kde.gaussian(1, lengthscale))), 1, 1
+    )
+
+    estimated = estimator(estimated)
+
+    estimated *= 255 / np.amax(estimated)
+    io.imsave(fname_out, estimated.astype("uint8"))

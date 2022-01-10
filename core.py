@@ -84,19 +84,3 @@ def subdivided_array_slices(array, step_size=10):
     )
 
 
-def euclidean_distance(x, y):
-    return np.sqrt(np.sum(np.square(x - y)))
-
-
-def euclidean_norm(x):
-    return euclidean_distance(x, x)
-
-
-def to_radial_function(function):
-
-    def radial_function(x):
-        return function(euclidean_norm(x))
-
-    return radial_function
-
-
