@@ -1,35 +1,31 @@
-from scipy import stats
-import numpy as np
 from core import *
 
 
-def euclidean_distance(x, y):
-    return np.sqrt(np.sum(np.square(x - y)))
-
-
 def euclidean_norm(x):
-    return euclidean_distance(x, x)
+    return np.sqrt(np.sum(np.square(x)))
+
+
+def euclidean_distance(x, y):
+    return euclidean_norm(x - y)
 
 
 def to_radial_function(function):
+    return lambda x: function(euclidean_norm(x))
 
-    def radial_function(x):
-        return function(euclidean_norm(x))
 
-    return radial_function
+def find_bounds_for_gaussian(sigma, epsilon=np.finfo(float).eps/2):
+    # cf. Proposition 1.2 on p.1 in mathematical_foundations.pdf
+    return sigma * np.sqrt(-2*np.log(np.sqrt(2 * np.pi) * epsilon/sigma))
 
 
 def gaussian(mean, std):
-    def gaussian_with_mean_and_var(_x):
-        return stats.norm.pdf(_x, loc=mean, scale=std)
-    return gaussian_with_mean_and_var
+    from scipy import stats
+    gaussian_with_mean_and_var = stats.norm(loc=mean, scale=std)
+    return gaussian_with_mean_and_var.pdf
 
 
-def automatic_gaussian(x):
-    mean = x.mean
-    std = x.std
-
-    return gaussian(mean, std)
+def radial_gaussian(mean, std):
+    return lambda x: to_radial_function(gaussian(0, std))(x - mean)
 
 
 def bandwidth_rule_of_thumb(n, std):
@@ -40,26 +36,25 @@ def bandwidth_rule_of_thumb(n, std):
 
 
 def linear(a, b):
-
-    def linear_function(x):
-        return (x - a)/b
-
-    return linear_function
+    return lambda x: (x - a)/b
 
 
 def kernel_density_estimator(x, h, kernel):
+    # TODO: Improve efficiency for large sets of x
     n = len(x)
 
     def estimator(_x):
-
+        output_n = len(_x)
         if n == 0:
-            return 0.
+            return np.zeros((output_n, 1))
 
         else:
-            cumulative_sum = 0.
-            for i in range(n):
-                cumulative_sum += kernel(linear(x[i], h)(_x))
-            return cumulative_sum / (n*h)
+            raw_output = np.empty((output_n, n))
+            with np.nditer(raw_output, flags=["multi_index"], op_flags=["writeonly"]) as it:
+                for i in it:
+                    j, k = it.multi_index
+                    i[...] = kernel(linear(x[k], h)(_x[j]))
+
+            return np.sum(raw_output, 1, keepdims=True)
 
     return estimator
-

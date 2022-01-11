@@ -16,6 +16,3 @@ def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
     rbf_model.likelihood.variance.assign(noise_value)
 
     return rbf_model
-
-
-

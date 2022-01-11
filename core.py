@@ -58,29 +58,3 @@ def sparsify(fx, threshold, *xi_or_slice, dtype_sparse_coords=np.dtype(float), d
 
     return sparse_coords, sparse_fx
 
-
-def subdivided_array_slices(array, step_size=10):
-    ndim = array.ndim
-    shape = array.shape
-    step_size, shape = np.broadcast_arrays(step_size, shape)
-
-    q, r = np.divmod(shape, step_size)
-
-    index_lookup_table = []
-
-    index_lookup_table_bounds_minus_1 = []
-
-    for i in range(ndim):
-        index_lookup_table.append(np.arange(q[i]+1) * step_size[i])
-        if r[i] != 0:
-            index_lookup_table[i] = np.append(index_lookup_table[i], shape[i])
-
-        index_lookup_table_bounds_minus_1.append(slice(0, len(index_lookup_table[i]) - 1))
-
-    indices = coord_or_index_list(*index_lookup_table_bounds_minus_1) + 1
-
-    return tuple(
-        tuple(slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)) for i in indices
-    )
-
-
