@@ -1,9 +1,8 @@
 from core import *
-import numpy as np
-import gpflow as gpf
 
 
 def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
+    import gpflow as gpf
     x = exactly_2d(x=x)
     fx = exactly_2d(x=fx)
 

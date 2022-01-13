@@ -45,10 +45,11 @@ def tif_pipeline_kde(fname_in, fname_out):
 
     threshold = 0.05
     lengthscale = 4
-    epsilon = int(np.ceil(kde.find_bounds_for_gaussian(lengthscale)))
+    epsilon = int(np.ceil(kde.find_bounds_for_gaussian(lengthscale, 1./255)))
     j = 1
-    for i in image_processing.subdivided_array_and_considered_part_slices(estimated, 20, epsilon):
-        print(j)
+    it = image_processing.subdivided_array_and_considered_part_slices(estimated, 40, epsilon)
+    for i in it:
+        print(str(j)+"/"+str(len(it)))
         j += 1
         shape = image_processing.shape_from_slice(*i[0])
         x, fx = sparsify(image[i[1]], threshold, *i[1])

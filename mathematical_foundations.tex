@@ -1,0 +1,60 @@
+\documentclass{article}
+
+\usepackage{amsmath, amssymb, amsthm, enumitem}
+\usepackage[margin=2cm]{geometry}
+
+\title{Mathematical Foundations}
+\author{Max-Planck Institute for Neurobiology}
+
+\theoremstyle{plain}
+\newtheorem{lma}{Lemma}[subsection]
+\newtheorem{prp}[lma]{Proposition}
+\newtheorem{thm}[lma]{Theorem}
+
+\theoremstyle{remark}
+\newtheorem*{rmk}{Remark}
+
+\theoremstyle{definition}
+\newtheorem{dfn}[lma]{Definition}
+
+\newenvironment{proofsketch}{%
+  \renewcommand{\proofname}{Proof sketch}\proof}{\endproof}
+  
+ \begin{document}
+ \maketitle
+ \section{Numerical Estimates}
+ \subsection{Estimates on the Gaussian function and derived functions}
+ \begin{dfn}{(Radial Gaussian function)} \label{radialgaussian}
+Given the \emph{Gaussian function}
+ \begin{equation*}
+g_{\sigma, \mu}: \begin{array}{c} \mathbb{R} \to \mathbb{R}_> \\  x \mapsto \frac{1}{\sigma \sqrt{2 \pi}} \exp \left( - \frac{(x - \mu)^2}{2 \sigma^2} \right) \end{array}
+ \end{equation*}
+ with parameters $\sigma \in \mathbb{R}_>$ and $\mu \in \mathbb{R}$, we define, with $\sigma$ as before and now $\mu \in \mathbb{R}^n$, the ($n$-dimensional) radial Gaussian function for $n \in \mathbb{N}$
+ \begin{equation*}
+ G_{\sigma, \mu}: \begin{array}{c} \mathbb{R}^n \to \mathbb{R}_> \\ x \mapsto g_{\sigma, 0} ( | x - \mu | ) \end{array},
+ \end{equation*}
+ where $| \cdot |$ is Euclidean distance.
+ \end{dfn}
+ \begin{rmk}
+ Since the Gaussian function is symmetric in $\mu$, the $1$-dimensional radial Gaussian function is identical to the Gaussian function.
+ \end{rmk}
+ \begin{prp} Let $G_{\sigma, \mu}$ be a $n$-dimensional radial Gaussian function (cf. Definition \ref{radialgaussian}) with parameters $\sigma$ and $\mu$. For $\varepsilon < \frac{\sigma}{\sqrt{2 \pi}}$, we have for all $x \in \mathbb{R}^n$:
+ \begin{equation*}
+|x - \mu| > \sigma \sqrt{ - 2 \ln \left( \frac{\sqrt{2 \pi} \varepsilon}{\sigma} \right)} \iff G_{\sigma, \mu}(x) < \varepsilon.
+ \end{equation*}
+ \end{prp}
+ \begin{proof} Let $\tilde{x} := |x - \mu|$ for $x \in \mathbb{R}^n$. The proof is due to a simple calculation:
+ \begin{equation*}
+ G_{\sigma, \mu} (x) = g_{\sigma, \mu} (\tilde{x}) = \frac{1}{\sigma \sqrt{2 \pi}} \exp \left( - \frac{\tilde{x}^2}{2 \sigma^2} \right),
+ \end{equation*}
+ so
+ \begin{align*}
+& G_{\sigma, \mu} (x) < \varepsilon \\
+\iff & g_{\sigma, \mu} ( \tilde{x} ) < \varepsilon \\
+\iff & - \frac{\tilde{x}^2}{2 \sigma^2} < \ln \left(  \frac{\sqrt{2 \pi} \varepsilon}{\sigma} \right) \\
+\intertext{We use our assumption on $\varepsilon$ to obtain $- \ln \left( \frac{ \sqrt{2 \pi} \varepsilon}{\sigma} \right) > 0$. Equivalence uses $\tilde{x} \geq 0$.}
+\iff & \tilde{x} > \sigma \sqrt{ - 2 \ln \left( \frac{\sqrt{2 \pi} \varepsilon}{\sigma} \right)}
+ \end{align*}
+ \end{proof}
+ \subsection{Estimates on Gaussian processes}
+ \end{document}
