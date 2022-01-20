@@ -39,22 +39,17 @@ def linear(a, b):
     return lambda x: (x - a)/b
 
 
-def kernel_density_estimator(x, h, kernel):
-    # TODO: Improve efficiency for large sets of x
-    n = len(x)
+def naive_kernel_density_estimation(x, h, kernel, epsilon, step=None):
+    # !!! Do not use: very slow
+    from scipy.signal import convolve
 
-    def estimator(_x):
-        output_n = len(_x)
-        if n == 0:
-            return np.zeros((output_n, 1))
+    epsilon = np.broadcast_to(epsilon, (x.shape[1],))
+    convolution_matrix = np.empty(epsilon)
 
-        else:
-            raw_output = np.empty((output_n, n))
-            with np.nditer(raw_output, flags=["multi_index"], op_flags=["writeonly"]) as it:
-                for i in it:
-                    j, k = it.multi_index
-                    i[...] = kernel(linear(x[k], h)(_x[j]))
+    if step is not None:
+        step = np.broadcast_to(step, (x.shape[1],))
 
-            return np.sum(raw_output, 1, keepdims=True)
 
-    return estimator
+def gaussian_kernel_density_estimation(x, sigma):
+    from scipy.ndimage import gaussian_filter
+    return gaussian_filter(x, sigma)

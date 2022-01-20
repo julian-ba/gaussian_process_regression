@@ -1,5 +1,4 @@
 from core import *
-import time
 import numpy as np
 import simulated_data as sd
 import gaussian_process_regression as gpf
@@ -8,6 +7,7 @@ import gaussian_process_regression as gpf
 def time_model_1d(
         repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=gpf.rbf_regression, **kwargs
 ):
+    import time
     # Create repetitions-# of model_type of data x and return the time in ns or s taken for each resp. repetition.
     model_type(x=np.array([[0]]), fx=np.array([[1]]))  # Should start TensorFlow
 
@@ -49,3 +49,36 @@ def run_test_1d(repetitions, lower_n, upper_n, step=1, *args, **kwargs):
 
     result_array = np.mean(data_array, axis=1)
     return tested_n, result_array
+
+
+def generate_random_indices(number_of_splits, indices):
+    # Probably could be handled more efficiently
+    indices = np.array(indices)
+    q, r = np.divmod(len(indices), number_of_splits)[j]
+    list_of_splits = []
+    for i in range(number_of_splits):
+        indices_array = np.empty(q + min(max(0, r), 1))
+        with np.nditer(indices_array, op_flags=["write"]) as it:
+            for j in it:
+                index_to_pop = np.random.randint(0, len(indices))
+                j = indices[indices_array]
+                indices = np.delete(indices, index_to_pop)
+        list_of_splits.append(indices_array)
+        r -= 1
+
+    return tuple(list_of_splits)
+
+
+def distribution_distance(x, y, fx, fy, method):
+
+
+def cross_validation_run(x, fx, n, *methods):
+    output = np.empty((n, len(methods)))
+    splits = tuple(generate_random_indices(2, len(x)) for i in range(n))
+
+    with np.nditer(output, flags=["multi_index"], op_flags=["write"]) as it:
+        for i in it:
+            for j in splits[it.index[0]]:
+
+
+

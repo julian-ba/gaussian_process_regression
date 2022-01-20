@@ -2,7 +2,7 @@ from core import *
 from numpy import dtype
 
 
-def import_tif_file(fname, datatype=dtype(float), **kwargs):
+def import_tif_file(fname, datatype=None, **kwargs):
     from skimage import io
 
     if dtype is None:
@@ -18,7 +18,11 @@ def export_tif_file(fname, array, datatype=dtype("uint8"), fit=False, **kwargs):
         datatype = array.dtype
 
     if fit:
-        array *= np.finfo(datatype).max / np.amax(array)
+        if np.all(array == 0):
+            pass
+        else:
+            normalization_coefficient = np.divide(float(np.iinfo(datatype).max), np.amax(array))
+            array *= normalization_coefficient
 
     io.imsave(fname, array.astype(datatype), **kwargs)
 

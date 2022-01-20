@@ -36,31 +36,13 @@ def tif_pipeline_gpr(fname_in, fname_out_mean, fname_out_var):
 
 
 def tif_pipeline_kde(fname_in, fname_out):
-    import kernel_density_estimation as kde
-    import image_processing
+    from kernel_density_estimation import gaussian_kernel_density_estimation
+    from image_processing import import_tif_file, export_tif_file
 
-    image = image_processing.import_tif_file(fname=fname_in)
+    image = import_tif_file(fname=fname_in)
 
-    estimated = np.empty_like(image)
+    estimated = gaussian_kernel_density_estimation(image, (3, 9, 9))
 
-    threshold = 0.05
-    lengthscale = 4
-    epsilon = int(np.ceil(kde.find_bounds_for_gaussian(lengthscale, 1./255)))
-    j = 1
-    it = image_processing.subdivided_array_and_considered_part_slices(estimated, 40, epsilon)
-    for i in it:
-        print(str(j)+"/"+str(len(it)))
-        j += 1
-        shape = image_processing.shape_from_slice(*i[0])
-        x, fx = sparsify(image[i[1]], threshold, *i[1])
-        bandwidth = kde.bandwidth_rule_of_thumb(len(fx), lengthscale)
-        if fx.size == 0:
-            mean = 0.
-        else:
-            mean = fx.mean()
-        grid_coords = coord_or_index_list(*i[0])
-        image[i[0]] = kde.kernel_density_estimator(
-            x, bandwidth, kde.radial_gaussian(mean, lengthscale)
-        )(grid_coords).reshape(shape)
+    estimated = np.log(estimated/2+1.)
 
-    image_processing.export_tif_file(fname_out, estimated, fit=True)
+    export_tif_file(fname_out, estimated, np.dtype("uint16"), fit=True)
