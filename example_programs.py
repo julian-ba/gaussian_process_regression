@@ -18,12 +18,12 @@ def tif_pipeline_gpr(fname_in, fname_out_mean, fname_out_var):
         # Subdivide image into parts; we create a model for each part due to memory constraints.
         shape_of_image_part = image_processing.shape_from_slice(*i[0])
 
-        x, fx = sparsify(image[i[1]], threshold, *i[1])  # The points with which we generate each model
+        x, fx = image_processing.sparsify(image[i[1]], threshold, *i[1])  # The points with which we generate each model
 
         if x.size == 0:  # If there are no points, we simply set mean[i] to be 0 everywhere
             mean[i] = np.zeros_like(mean[i[0]])
         else:  # Otherwise, we generate a model using x, fx
-            model = gpr.rbf_regression(x=x, fx=fx, lengthscales=lengthscale, noise_value=noise)
+            model = gpr.rbf_regression_model(x=x, fx=fx, lengthscales=lengthscale, noise_value=noise)
             grid_coord_list = coord_or_index_list(*i[0]).astype(np.dtype(float))
             mean_part, var_part = model.predict_f(grid_coord_list)
             mean_part = mean_part.numpy().reshape(shape_of_image_part)

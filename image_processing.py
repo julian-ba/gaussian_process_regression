@@ -84,3 +84,23 @@ def subdivided_array_and_considered_part_slices(array, step_size, epsilon):
     cps = considered_part_slices(sas, epsilon, array.shape)
     concatenated = [(sas[i], cps[i]) for i in range(len(sas))]
     return concatenated
+
+
+def sparsify(fx, threshold, *xi_or_slice, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float)):
+    # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
+    # values are greater than threshold.
+    indices = np.nonzero(fx >= threshold)
+    sparse_fx = exactly_2d(fx[indices])
+    if xi_or_slice == ():
+        xi_or_slice = (slice(0, i) for i in fx.shape)
+
+    coordinate_array = coord_or_index_array(*xi_or_slice)
+    sparse_coords = coordinate_array[indices]
+
+    if dtype_sparse_coords is not None:
+        sparse_coords = sparse_coords.astype(dtype_sparse_coords)
+
+    if dtype_sparse_fx is not None:
+        sparse_fx = sparse_fx.astype(dtype_sparse_fx)
+
+    return sparse_coords, sparse_fx

@@ -1,7 +1,7 @@
 from core import *
 
 
-def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
+def rbf_regression_model(x, fx, variance, lengthscales, noise_value=None):
     import gpflow as gpf
     x = exactly_2d(x=x)
     fx = exactly_2d(x=fx)
@@ -15,3 +15,12 @@ def rbf_regression(x, fx, variance=1., lengthscales=1, noise_value=None):
     rbf_model.likelihood.variance.assign(noise_value)
 
     return rbf_model
+
+
+def rbf_regression(shape, step, x, fx, **kwargs):
+    model = rbf_regression_model(x, fx, **kwargs)
+    return model.predict_f(coord_array_from_shape_and_step(shape, step))[0].numpy().reshape(shape)
+
+
+def rbf_regressor(**kwargs):
+    return lambda evaluate_at: rbf_regression(evaluate_at, **kwargs)

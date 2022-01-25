@@ -64,38 +64,27 @@ def index_list_from_shape(shape):
     return coord_or_index_list(*slices)
 
 
-def coord_list_from_shape_and_step(shape, step):
+def xis_from_shape_and_step(shape, step):
     shape, step = np.broadcast_arrays(shape, step)
     xis = []
     for i in range(len(shape)):
         xis.append(np.arange(shape[i]) * step[i])
-    return coord_or_index_list(*xis)
+    return tuple(xis)
+
+
+def coord_list_from_shape_and_step(shape, step):
+    return coord_or_index_list(*xis_from_shape_and_step(shape, step))
+
+
+def to_coord_list_from_step(index_list, step):
+    step = exactly_2d(np.broadcast_to(step, index_list.shape[1]))
+    return index_list * step
 
 
 def list_from_array(array):
-    return array.reshape((-1, array.shape[1]))
+    return array.reshape((-1, len(array.shape)))
 
 
-def array_from_list_and_shape(point_list, shape):
+def to_array_from_list_and_shape(point_list, shape):
     return point_list.reshape(shape)
-
-
-def sparsify(fx, threshold, *xi_or_slice, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float)):
-    # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
-    # values are greater than threshold.
-    indices = np.nonzero(fx >= threshold)
-    sparse_fx = exactly_2d(fx[indices])
-    if xi_or_slice == ():
-        xi_or_slice = (slice(0, i) for i in fx.shape)
-
-    coordinate_array = coord_or_index_array(*xi_or_slice)
-    sparse_coords = coordinate_array[indices]
-
-    if dtype_sparse_coords is not None:
-        sparse_coords = sparse_coords.astype(dtype_sparse_coords)
-
-    if dtype_sparse_fx is not None:
-        sparse_fx = sparse_fx.astype(dtype_sparse_fx)
-
-    return sparse_coords, sparse_fx
 

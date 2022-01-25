@@ -5,7 +5,7 @@ import gaussian_process_regression as gpf
 
 
 def time_model_1d(
-        repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=gpf.rbf_regression, **kwargs
+        repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=gpf.rbf_regression_model, **kwargs
 ):
     import time
     # Create repetitions-# of model_type of data x and return the time in ns or s taken for each resp. repetition.
@@ -51,34 +51,65 @@ def run_test_1d(repetitions, lower_n, upper_n, step=1, *args, **kwargs):
     return tested_n, result_array
 
 
-def generate_random_indices(number_of_splits, indices):
+def generate_splits(number_of_splits, array):
     # Probably could be handled more efficiently
-    indices = np.array(indices)
-    q, r = np.divmod(len(indices), number_of_splits)[j]
+    internal_array = array
+    q, r = np.divmod(len(internal_array), number_of_splits)
     list_of_splits = []
     for i in range(number_of_splits):
         indices_array = np.empty(q + min(max(0, r), 1))
         with np.nditer(indices_array, op_flags=["write"]) as it:
             for j in it:
-                index_to_pop = np.random.randint(0, len(indices))
-                j = indices[indices_array]
-                indices = np.delete(indices, index_to_pop)
+                index_to_pop = np.random.randint(0, len(internal_array))
+                j[...] = internal_array[indices_array]
+                internal_array = np.delete(internal_array, index_to_pop)
         list_of_splits.append(indices_array)
         r -= 1
 
     return tuple(list_of_splits)
 
 
-def distribution_distance(x, y, fx, fy, method):
+def random_indices(number_of_splits, upper_index):
+    return generate_splits(number_of_splits, np.arange(upper_index))
 
 
-def cross_validation_run(x, fx, n, *methods):
+def euclidean_distribution_distance(x, y):
+    return np.sqrt(np.sum(np.square(x - y)))
+
+
+def cross_val_run_single_fish(fish, n, methods, step=None, distance=euclidean_distribution_distance):
     output = np.empty((n, len(methods)))
-    splits = tuple(generate_random_indices(2, len(x)) for i in range(n))
+    from image_processing import sparsify
+    x, fx = sparsify(fish)
+    for i in range(n):
 
-    with np.nditer(output, flags=["multi_index"], op_flags=["write"]) as it:
-        for i in it:
-            for j in splits[it.index[0]]:
+        for method in methods:
+            analysed1 = method(split1)
 
+
+
+
+def cross_val_run_multiple_fish(fish, n, methods=None, distance=euclidean_distribution_distance):
+    # Warning! This will probably not work as intended or at all if the elements of fish have different shapes.
+    fish_shape = fish[0].shape
+    output = np.empty((n, len(methods)))
+    for i in range(n):
+        splits1, splits2 = random_indices(2, len(fish))
+        agglomerated_fish1 = np.zeros(fish_shape)
+        for j in splits1:
+            agglomerated_fish1 += fish[j]
+        agglomerated_fish1 /= len(splits1)
+
+        agglomerated_fish2 = np.zeros(fish_shape)
+        for j in splits2:
+            agglomerated_fish2 += fish[j]
+        agglomerated_fish2 /= len(splits2)
+
+        for j in range(len(methods)):
+            analysed1 = methods[j](agglomerated_fish1)
+            analysed2 = methods[j](agglomerated_fish2)
+            output[i, j] = distance(analysed1, analysed2)
+
+    return output
 
 
