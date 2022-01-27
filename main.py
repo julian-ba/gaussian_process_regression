@@ -1,9 +1,8 @@
-import scipy.ndimage
 import numpy as np
 
-import example_programs
+import image_processing
+import testing
+from skimage import img_as_float
 
-example_programs.tif_pipeline_kde(
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish10_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/output.tif"
-)
+fish = image_processing.import_tif_file(*image_processing.fish_fnames, datatype=np.dtype(float))
+print(testing.cross_val_run(fish, 20))

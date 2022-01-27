@@ -1,14 +1,24 @@
 from core import *
 from numpy import dtype
 
+fish_fnames = [
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish10_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish11_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish12_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish13_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish14_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish15_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish17_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
+    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish18_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif"
+]
 
-def import_tif_file(fname, datatype=None, **kwargs):
+
+def import_tif_file(*fname, datatype=None, **kwargs):
     from skimage import io
-
-    if dtype is None:
-        return io.imread(fname=fname, **kwargs)
+    if datatype is None:
+        return tuple(io.imread(fnamei, **kwargs) for fnamei in fname)
     else:
-        return io.imread(fname=fname, **kwargs).astype(dtype=datatype)
+        return tuple(io.imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
 
 
 def export_tif_file(fname, array, datatype=dtype("uint8"), fit=False, **kwargs):
@@ -25,6 +35,20 @@ def export_tif_file(fname, array, datatype=dtype("uint8"), fit=False, **kwargs):
             array *= normalization_coefficient
 
     io.imsave(fname, array.astype(datatype), **kwargs)
+
+
+def find_minimal_shape(*image):
+    shape = image[0].shape
+    for imag in image:
+        shape = tuple(min(shape[i], imag.shape[i]) for i in range(len(shape)))
+
+    return shape
+
+
+def reshape_images_to_same_shape(*image):
+    shape = find_minimal_shape(*image)
+    slices = tuple(slice(0, i) for i in shape)
+    return tuple(imag[slices] for imag in image), shape
 
 
 def subdivided_array_slices(array, step_size=10):

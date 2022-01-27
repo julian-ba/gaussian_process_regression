@@ -53,7 +53,3 @@ def naive_kernel_density_estimation(x, h, kernel, epsilon, step=None):
 def gaussian_kernel_density_estimation(x, sigma):
     from scipy.ndimage import gaussian_filter
     return gaussian_filter(x, sigma)
-
-
-def gaussian_kernel_density_estimator(sigma):
-    return lambda x: gaussian_kernel_density_estimation(x, sigma)

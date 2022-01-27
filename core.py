@@ -64,6 +64,15 @@ def index_list_from_shape(shape):
     return coord_or_index_list(*slices)
 
 
+def xis_from_slice_and_step(step, *slicei):
+    _step = np.broadcast_to(step, (len(slicei),))
+    output = []
+    for i in range(len(slicei)):
+        output.append(np.arange(slicei[i].start, slicei[i].stop, slicei[i].step) * _step[i])
+
+    return tuple(output)
+
+
 def xis_from_shape_and_step(shape, step):
     shape, step = np.broadcast_arrays(shape, step)
     xis = []
@@ -87,4 +96,9 @@ def list_from_array(array):
 
 def to_array_from_list_and_shape(point_list, shape):
     return point_list.reshape(shape)
+
+
+def resize_to_indices(variable, step):
+    v = np.broadcast_to(variable, len(step))
+    return np.ceil(v/np.array(step)).astype(np.dtype(int))
 
