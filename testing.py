@@ -78,11 +78,11 @@ def euclidean_distribution_distance(x, y):
 
 
 def cross_val_run(fish, n):
-    # Warning! This will probably not work as intended or at all if the elements of fish have different shapes.
-    from gaussian_process_regression import regress_over_large_array
+    from gaussian_process_regression import rbf_regression_over_large_array
     from kernel_density_estimation import gaussian_kernel_density_estimation
-    from image_processing import reshape_images_to_same_shape
-    ffish, fish_shape = reshape_images_to_same_shape(*fish)
+    from image_processing import crop_arrays_to_same_shape
+    ffish = crop_arrays_to_same_shape(*fish)
+    fish_shape = ffish[0].shape
     output = np.empty((n, 2))
     for i in range(n):
         splits1, splits2 = random_indices(2, len(ffish))
@@ -91,14 +91,14 @@ def cross_val_run(fish, n):
         for j in splits1:
             agglomerated_fish1 += ffish[j]
         agglomerated_fish1 /= len(splits1)
-        gpr1 = regress_over_large_array(agglomerated_fish1, 0.05, (1., 3., 3.))
-        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (1., 3., 3.))
+        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 1., 1., step=(1, 3, 3))
+        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (1, 3, 3))
 
         agglomerated_fish2 = np.zeros(fish_shape)
         for j in splits2:
             agglomerated_fish2 += ffish[j]
         agglomerated_fish2 /= len(splits2)
-        gpr2 = regress_over_large_array(agglomerated_fish2, 0.05, (1., 3., 3.))
+        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 1., 1.)
         kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (1., 3., 3.))
 
         output[i, 0] = euclidean_distribution_distance(gpr1, gpr2)

@@ -15,90 +15,187 @@ def exactly_2d(x):
     return output_array
 
 
-def coord_array(*xi):
-    return np.stack(np.meshgrid(*xi, indexing="ij"), axis=-1)
+def subdivided_array_slices(array, step_size):
+    ndim = array.ndim
+    shape = array.shape
+    step_size = np.broadcast_to(step_size, ndim)
 
+    r = np.remainder(np.array(shape), step_size, dtype=int)
 
-def index_to_coord_array_via_step(array, step_sizes):
-    step_sizes = np.broadcast_to(step_sizes, (array.shape[-1],))
-    step_sizes = np.expand_dims(step_sizes, tuple((i for i in range(array.dim - 1))))
-    return array * step_sizes
+    index_lookup_table = []
 
+    index_lookup_table_bounds_minus_1 = []
 
-def index_array(*slices):
-    ndim = len(slices)
-    cyclic_permutation = list(range(1, ndim + 1))
-    cyclic_permutation.append(0)
-    return np.mgrid[slices].transpose(cyclic_permutation)
+    for i in range(ndim):
+        index_lookup_table.append(np.arange(0, shape[i], step_size[i], dtype=int))
+        if r[i] != 0:
+            index_lookup_table[i] = np.append(index_lookup_table[i], shape[i])
 
+        index_lookup_table_bounds_minus_1.append(slice(0, len(index_lookup_table[i]) - 1))
 
-def coord_or_index_array(*xi_or_slice):
-    if all((isinstance(i, slice) for i in xi_or_slice)):
-        return index_array(*xi_or_slice)
-    elif all((isinstance(i, np.ndarray) for i in xi_or_slice)):
-        return coord_array(*xi_or_slice)
-    else:
-        raise ValueError("The only allowed arguments are tuples of exclusively NumPy arrays or slices.")
+    indices = Grid(index_lookup_table_bounds_minus_1).get_list() + 1
 
-
-def coord_array_from_shape_and_step(shape, step):
-    shape, step = np.broadcast_arrays(shape, step)
-    xis = []
-    for i in range(len(shape)):
-        xis.append(np.arange(shape[i]) * step[i])
-
-    return coord_or_index_array(*xis)
-
-
-def index_array_from_shape(shape):
-    slices = tuple((slice(0, i) for i in shape))
-    return coord_or_index_array(*slices)
-
-
-def coord_or_index_list(*xi_or_slice):
-    return coord_or_index_array(*xi_or_slice).reshape((-1, len(xi_or_slice)))
-
-
-def index_list_from_shape(shape):
-    slices = tuple((slice(0, i) for i in shape))
-    return coord_or_index_list(*slices)
-
-
-def xis_from_slice_and_step(step, *slicei):
-    _step = np.broadcast_to(step, (len(slicei),))
     output = []
-    for i in range(len(slicei)):
-        output.append(np.arange(slicei[i].start, slicei[i].stop, slicei[i].step) * _step[i])
 
-    return tuple(output)
-
-
-def xis_from_shape_and_step(shape, step):
-    shape, step = np.broadcast_arrays(shape, step)
-    xis = []
-    for i in range(len(shape)):
-        xis.append(np.arange(shape[i]) * step[i])
-    return tuple(xis)
+    for i in indices:
+        output.append(tuple(slice(index_lookup_table[j][i[j]-1], index_lookup_table[j][i[j]]) for j in range(ndim)))
 
 
-def coord_list_from_shape_and_step(shape, step):
-    return coord_or_index_list(*xis_from_shape_and_step(shape, step))
+    return output
 
 
-def to_coord_list_from_step(index_list, step):
-    step = exactly_2d(np.broadcast_to(step, index_list.shape[1]))
-    return index_list * step
+def shape_from_slice(*slice_i):
+    return tuple(i.stop - i.start for i in slice_i)
 
 
-def list_from_array(array):
-    return array.reshape((-1, len(array.shape)))
+def considered_part_slices(list_of_tuples_of_slices, epsilon, upper_bounds):
+    epsilon = np.broadcast_to(epsilon, (len(list_of_tuples_of_slices[0]),)).astype(int)
+    list_of_considered_part = []
+    for i in list_of_tuples_of_slices:
+        list_of_new_slices = []
+        for j in range(len(i)):
+            start = i[j].start - epsilon[j]
+            if start < 0:
+                start = 0
+
+            stop = i[j].stop + epsilon[j]
+            if stop > upper_bounds[j]:
+                stop = upper_bounds[j]
+
+            list_of_new_slices.append(slice(start, stop))
+        list_of_considered_part.append(tuple(list_of_new_slices))
+
+    return list_of_considered_part
 
 
-def to_array_from_list_and_shape(point_list, shape):
-    return point_list.reshape(shape)
+def subdivided_array_and_considered_part_slices(array, step_size, epsilon):
+    sas = subdivided_array_slices(array, step_size)
+    cps = considered_part_slices(sas, epsilon, array.shape)
+    concatenated = [(sas[i], cps[i]) for i in range(len(sas))]
+    return concatenated
 
 
-def resize_to_indices(variable, step):
-    v = np.broadcast_to(variable, len(step))
-    return np.ceil(v/np.array(step)).astype(np.dtype(int))
+def sparsify(
+        fx, threshold, slices=None, step=None, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float)
+):
+    # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
+    # values are greater than threshold.
+    indices = np.nonzero(fx >= threshold)
+    sparse_fx = exactly_2d(fx[indices])
+    if slices is None:
+        grid = Grid(fx.shape, step)
+    else:
+        grid = Grid(slices, step)
+
+    coordinate_array = grid.get_array()
+    sparse_coords = coordinate_array[indices]
+
+    if dtype_sparse_coords is not None:
+        sparse_coords = sparse_coords.astype(dtype_sparse_coords)
+
+    if dtype_sparse_fx is not None:
+        sparse_fx = sparse_fx.astype(dtype_sparse_fx)
+
+    return sparse_coords, sparse_fx
+
+
+class LargeArrayIterator:
+    # Currently not functional. Do not use.
+    def __init__(self, array, n, threshold, eps, step):
+        from numpy import ma
+        self.array = ma.masked_array(array, copy=True)
+        self.ndim = self.array.ndim
+        self.shape = self.array.shape
+        self.n = n
+        self.step = step
+        #  self.integer_step =
+        self.threshold = threshold
+        self.eps = np.array(eps)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        from numpy import ma
+        if ma.count(self.array) == 0:
+            raise StopIteration
+        else:
+            first_not_evaluated_point = np.argwhere(ma.getmaskarray(self.array))[0]
+
+
+class Grid:
+    def convert_to_coords(self, step):
+        step = np.broadcast_to(step, (self.ndim,))
+        for i in range(self.ndim):
+            self.axes[i] *= step[i]
+        self.indexable = False
+
+    def _initialize_from_shape(self, shape):
+        self.shape = shape
+        slices = [slice(i) for i in self.shape]
+        self._initialize_from_slices(slices)
+
+    def _initialize_from_slices(self, slices):
+        list_of_kwargs = []
+        for slice_ in slices:
+            kwargs = {}
+            if slice_.start is not None:
+                kwargs["start"] = slice_.start
+            if slice_.stop is not None:
+                kwargs["stop"] = slice_.stop
+            if slice_.step is not None:
+                kwargs["step"] = slice_.step
+            list_of_kwargs.append(kwargs)
+        self.axes = [np.arange(**kwargs) for kwargs in list_of_kwargs]
+        self.slices = list(slices)
+        self.ndim = len(self.axes)
+
+    def __init__(self, init, step=None):
+        if all([isinstance(i, slice) for i in init]):
+            self._initialize_from_slices(init)
+            self.shape = tuple([len(axis) for axis in self.axes])
+
+        elif all([isinstance(i, int) for i in init]):
+            init = tuple(init)
+            self._initialize_from_shape(init)
+
+        elif isinstance(init, np.ndarray):
+            self._initialize_from_shape(init.shape)
+
+        else:
+            raise ValueError
+
+        self.indexable = True
+        self.size = np.prod(self.shape)
+
+        if step is not None:
+            self.convert_to_coords(step)
+
+    def get_array(self, dtype=None):
+        if self.indexable:
+            cyclic_permutation = list(range(1, self.ndim + 1))
+            cyclic_permutation.append(0)
+            out = np.mgrid[self.slices].transpose(cyclic_permutation)
+
+        else:
+            out = np.stack(np.meshgrid(*self.axes, indexing="ij"), axis=-1)
+
+        if dtype is not None:
+            return out.astype(dtype)
+        else:
+            return out
+
+    def get_list(self, dtype=None):
+        return self.get_array(dtype).reshape((-1, self.ndim))
+
+    def get_axis(self, *i, dtype=None):
+        if dtype is not None:
+            return tuple(self.axes[idx].astype(dtype) for idx in i)
+        else:
+            return tuple(self.axes[idx] for idx in i)
+
+    def to_array(self, points):
+        points = exactly_2d(np.array(points))
+        assert points.size == self.size
+        return points.reshape(self.shape)
 

@@ -1,8 +1,4 @@
-import numpy as np
+from testing import cross_val_run
+from image_processing import fish_fnames, import_tif_file
 
-import image_processing
-import testing
-from skimage import img_as_float
-
-fish = image_processing.import_tif_file(*image_processing.fish_fnames, datatype=np.dtype(float))
-print(testing.cross_val_run(fish, 20))
+print(cross_val_run(import_tif_file(*fish_fnames, datatype=float), 10))

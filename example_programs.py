@@ -31,7 +31,7 @@ def tif_pipeline_gpr(fname_in, fname_out_mean, fname_out_var):
             mean[i[0]] = mean_part
             var[i[0]] = var_part
 
-    var = np.nan_to_num(var, np.amax(var))
+    np.nan_to_num(var, False, np.nanmin(var)[0])
 
     image_processing.export_tif_file(fname_out_mean, mean, fit=True)
     image_processing.export_tif_file(fname_out_var, var, fit=True)
