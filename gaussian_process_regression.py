@@ -27,11 +27,14 @@ def rbf_regression(x, threshold, variance, lengthscales, step=None, evaluate_at=
         evaluate_at = x
     grid = Grid(evaluate_at, step=step)
     _x, fx = sparsify(x, threshold)
-    grid_list = grid.get_list(dtype=float)
-    mean, var = rbf_regression_model(_x, fx, variance, lengthscales).predict_f(grid_list)
-    mean = mean.numpy()
-    var = var.numpy()
-    return grid.to_array(mean), grid.to_array(var)
+    if _x.size == 0:
+        return np.zeros(grid.shape), np.zeros_like(grid.shape)
+    else:
+        grid_list = grid.get_list(dtype=float)
+        mean, var = rbf_regression_model(_x, fx, variance, lengthscales).predict_f(grid_list)
+        mean = mean.numpy()
+        var = var.numpy()
+        return grid.to_array(mean), grid.to_array(var)
 
 
 def rbf_regression_over_large_array(x, threshold, variance, lengthscales, step=None):
