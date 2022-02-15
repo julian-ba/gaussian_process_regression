@@ -93,13 +93,15 @@ def cross_val_run(fish, n):
         agglomerated_fish1 /= len(splits1)
         gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 1., 1., step=(1, 3, 3))
         kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (1, 3, 3))
+        print(np.nonzero(gpr1))
 
         agglomerated_fish2 = np.zeros(fish_shape)
         for j in splits2:
             agglomerated_fish2 += ffish[j]
         agglomerated_fish2 /= len(splits2)
-        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 1., 1.)
+        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 1., 1., step=(1, 3, 3))
         kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (1., 3., 3.))
+        print(np.nonzero(gpr2))
 
         output[i, 0] = euclidean_distribution_distance(gpr1, gpr2)
         output[i, 1] = euclidean_distribution_distance(kde1, kde2)

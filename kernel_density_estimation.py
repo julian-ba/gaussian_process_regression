@@ -40,6 +40,7 @@ def linear(a, b):
 
 
 def naive_kernel_density_estimation(x, h, kernel, epsilon, step=None):
+    raise NotImplementedError
     # !!! Do not use: very slow
     from scipy.signal import convolve
 
