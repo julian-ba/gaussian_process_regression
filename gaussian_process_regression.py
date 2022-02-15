@@ -21,12 +21,12 @@ def rbf_regression_model(x, fx, variance, lengthscales, noise_value=None):
     return rbf_model
 
 
-def rbf_regression(x, threshold, variance, lengthscales, step=None, evaluate_at=None):
+def rbf_regression(x, threshold, variance, lengthscales, step=None, evaluate_at=None, considered_at=None):
     from core import Grid, sparsify
     if evaluate_at is None:
         evaluate_at = x
     grid = Grid(evaluate_at, step=step)
-    _x, fx = sparsify(x, threshold)
+    _x, fx = sparsify(x, threshold, slices=considered_at)
     if fx.size == 0:
         return np.zeros(grid.shape), np.zeros_like(grid.shape)
     else:
@@ -40,9 +40,9 @@ def rbf_regression(x, threshold, variance, lengthscales, step=None, evaluate_at=
 def rbf_regression_over_large_array(x, threshold, variance, lengthscales, step=None):
     from core import LargeArrayIterator
     output = np.empty_like(x)
-    for slices in LargeArrayIterator(x, 60, np.ceil(5*lengthscales).astype(int)):
+    for slices in LargeArrayIterator(x, 60, np.ceil(5*lengthscales)):
         output[slices.evaluate] = rbf_regression(
-            x[slices.consider], threshold, variance, lengthscales, step, slices.evaluate)[0]
+            x[slices.consider], threshold, variance, lengthscales, step, slices.evaluate, slices.consider)[0]
 
     return output
 
