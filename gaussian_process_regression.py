@@ -1,9 +1,7 @@
 import numpy as np
 
-import image_processing
 
-
-def rbf_regression_model(x, fx, variance, lengthscales, noise_value=None):
+def rbf_regression_model(x, fx, lengthscales=1., variance=1., noise_value=None):
     from gpflow import models, kernels
     from core import exactly_2d
     from numpy import amax, abs
@@ -21,28 +19,37 @@ def rbf_regression_model(x, fx, variance, lengthscales, noise_value=None):
     return rbf_model
 
 
-def rbf_regression(x, threshold, variance, lengthscales, step=None, evaluate_at=None, considered_at=None):
+def rbf_regression(
+        x, threshold,
+        variance=1., step=None, evaluate_at=None, considered_at=None, fill="var",
+        **kwargs
+):
     from core import Grid, sparsify
     if evaluate_at is None:
         evaluate_at = x
     grid = Grid(evaluate_at, step=step)
     _x, fx = sparsify(x, threshold, slices=considered_at, step=step)
     if fx.size == 0:
-        return np.zeros(grid.shape), np.zeros_like(grid.shape)
+        if fill == "var":
+            fill = variance
+        return np.zeros(grid.shape), np.full(grid.shape, fill)
+
     else:
         grid_list = grid.get_list(dtype=float)
-        mean, var = rbf_regression_model(_x, fx, variance, lengthscales).predict_f(grid_list)
+        mean, var = rbf_regression_model(_x, fx, variance, **kwargs).predict_f(grid_list)
         mean = mean.numpy()
         var = var.numpy()
         return grid.to_array(mean), grid.to_array(var)
 
 
-def rbf_regression_over_large_array(x, threshold, variance, lengthscales, step=None):
+def rbf_regression_over_large_array(x, threshold, lengthscales=1., **kwargs):
     from core import LargeArrayIterator
-    output = np.empty_like(x)
+    output_mean = np.empty_like(x)
+    output_var = np.empty_like(x)
     for slices in LargeArrayIterator(x, 50, np.ceil(5*lengthscales)):
-        output[slices.evaluate] = rbf_regression(
-            x[slices.consider], threshold, variance, lengthscales, step, slices.evaluate, slices.consider)[0]
+        output_mean[slices.evaluate], output_var[slices.evaluate] = rbf_regression(
+            x[slices.consider], threshold, evaluate_at=slices.evaluate, considered_at=slices.consider, **kwargs
+        )
 
-    return output
+    return output_mean, output_var
 

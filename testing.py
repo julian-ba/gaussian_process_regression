@@ -1,15 +1,14 @@
 from core import *
 import numpy as np
 import simulated_data as sd
-import gaussian_process_regression as gpf
+from gaussian_process_regression import rbf_regression
 
 
 def time_model_1d(
-        repetitions, x, fx=sd.smooth_data, return_seconds=False, model_type=gpf.rbf_regression_model, **kwargs
+        repetitions, x, fx=sd.smooth_data, return_seconds=False, regressor=rbf_regression, **kwargs
 ):
     import time
     # Create repetitions-# of model_type of data x and return the time in ns or s taken for each resp. repetition.
-    model_type(x=np.array([[0]]), fx=np.array([[1]]))  # Should start TensorFlow
 
     testing_points = np.linspace(0, 10, 11)
 
@@ -19,15 +18,13 @@ def time_model_1d(
         for repetition_idx in range(repetitions):
             data = exactly_2d(fx(n=n, **kwargs))
             t1 = time.time_ns()
-            m = model_type(x=x, fx=data, **kwargs)
-            m.predict_f(testing_points)
+            regressor(x, data, **kwargs)
             t2 = time.time_ns()
-            del m
             output_array[repetition_idx] = t2 - t1
     else:
         for repetition_idx in range(repetitions):
             t1 = time.thread_time_ns()
-            m = model_type(x=x, fx=fx, **kwargs)
+            m = regressor(x=x, fx=fx, **kwargs)
             m.predict_f_samples(testing_points)
             t2 = time.thread_time_ns()
             output_array[repetition_idx] = t2 - t1
@@ -73,6 +70,10 @@ def random_indices(number_of_splits, upper_index):
     return generate_splits(number_of_splits, np.arange(upper_index))
 
 
+def norm_1(x, y):
+    return np.sum(np.abs(x - y))
+
+
 def euclidean_distribution_distance(x, y):
     return np.sqrt(np.sum(np.square(x - y)))
 
@@ -91,18 +92,18 @@ def cross_val_run(fish, n):
         for j in splits1:
             agglomerated_fish1 += ffish[j]
         agglomerated_fish1 /= len(splits1)
-        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 1., 5., step=(1, 3, 3))
-        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (1, 3, 3))
+        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 5., step=(1, 3, 3))[0]
+        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (5, 15, 15))
 
         agglomerated_fish2 = np.zeros(fish_shape)
         for j in splits2:
             agglomerated_fish2 += ffish[j]
         agglomerated_fish2 /= len(splits2)
-        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 1., 5., step=(1, 3, 3))
-        kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (1., 3., 3.))
+        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 5., step=(1, 3, 3))[0]
+        kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (5, 15, 15))
 
-        output[i, 0] = euclidean_distribution_distance(gpr1, gpr2)
-        output[i, 1] = euclidean_distribution_distance(kde1, kde2)
+        output[i, 0] = norm_1(gpr1, gpr2)
+        output[i, 1] = norm_1(kde1, kde2)
 
     return output
 

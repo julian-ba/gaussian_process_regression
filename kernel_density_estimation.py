@@ -39,16 +39,15 @@ def linear(a, b):
     return lambda x: (x - a)/b
 
 
-def naive_kernel_density_estimation(x, h, kernel, epsilon, step=None):
-    raise NotImplementedError
-    # !!! Do not use: very slow
+def kernel_density_estimation(x, h, kernel, epsilon, step=None):
     from scipy.signal import convolve
 
-    epsilon = np.broadcast_to(epsilon, (x.shape[1],))
-    convolution_matrix = np.empty(epsilon)
-
-    if step is not None:
-        step = np.broadcast_to(step, (x.shape[1],))
+    epsilon = np.broadcast_to(epsilon, x.ndim)
+    slices = [slice(-epsi, epsi+1) for epsi in epsilon]
+    grid = Grid(slices, step)
+    evaluate = grid.get_list()
+    convolution_matrix = grid.to_array(kernel(evaluate))
+    return convolve(x, convolution_matrix, "same")
 
 
 def gaussian_kernel_density_estimation(x, sigma):
