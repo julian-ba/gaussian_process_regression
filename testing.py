@@ -50,7 +50,7 @@ def run_test_1d(repetitions, lower_n, upper_n, step=1, *args, **kwargs):
 
 def generate_splits(number_of_splits, array):
     # Probably could be handled more efficiently
-    internal_array = array
+    internal_array = array.copy()
     q, r = np.divmod(len(internal_array), number_of_splits)
     list_of_splits = []
     for i in range(number_of_splits):
@@ -78,12 +78,13 @@ def euclidean_distribution_distance(x, y):
     return np.sqrt(np.sum(np.square(x - y)))
 
 
-def cross_val_run(fish, n):
+def cross_val_run(fish, n, output_image=False):
     from gaussian_process_regression import rbf_regression_over_large_array
     from kernel_density_estimation import gaussian_kernel_density_estimation
-    from image_processing import crop_arrays_to_same_shape
+    from image_processing import crop_arrays_to_same_shape, export_tif_file
     ffish = crop_arrays_to_same_shape(*fish)
     fish_shape = ffish[0].shape
+    middle_z = fish_shape[0]//2
     output = np.empty((n, 2))
     for i in range(n):
         splits1, splits2 = random_indices(2, len(ffish))
@@ -92,15 +93,21 @@ def cross_val_run(fish, n):
         for j in splits1:
             agglomerated_fish1 += ffish[j]
         agglomerated_fish1 /= len(splits1)
-        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 5., step=(1, 3, 3))[0]
+        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 100, step=(1, 20, 20))[0]
         kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (5, 15, 15))
 
         agglomerated_fish2 = np.zeros(fish_shape)
         for j in splits2:
             agglomerated_fish2 += ffish[j]
         agglomerated_fish2 /= len(splits2)
-        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 5., step=(1, 3, 3))[0]
+        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 100, step=(1, 20, 20))[0]
         kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (5, 15, 15))
+        if output_image:
+            if i < 2:
+                export_tif_file("gpr_run{}(1)".format(i), gpr1[middle_z], fit=True)
+                export_tif_file("gpr_run{}(2)".format(i), gpr2[middle_z], fit=True)
+                export_tif_file("kde_run{}(1)".format(i), kde1[middle_z], fit=True)
+                export_tif_file("kde_run{}(2)".format(i), kde2[middle_z], fit=True)
 
         output[i, 0] = norm_1(gpr1, gpr2)
         output[i, 1] = norm_1(kde1, kde2)
@@ -108,3 +115,21 @@ def cross_val_run(fish, n):
     return output
 
 
+def average_arrays(array, ratio, threshold, threshold1=None):
+    masked = np.ma.array(array, fill_value=0.)
+    rng = np.random.default_rng()
+    if threshold1 is not None:
+        np.ma.masked_greater(masked, threshold1, copy=False)
+
+    indices_above_threshold = np.ma.nonzero(masked > threshold)
+    index_num = len(indices_above_threshold[0])
+    indices = tuple(
+        dim[
+            rng.choice(index_num, size=int(ratio*index_num), replace=False)
+        ] for dim in indices_above_threshold
+    )
+    masked[indices] = np.ma.masked
+    output = np.zeros_like(array)
+    index_array = np.ma.getmaskarray(masked)
+    output[index_array] = array[index_array]
+    return output

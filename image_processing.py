@@ -21,8 +21,8 @@ def import_tif_file(*fname, datatype=None, **kwargs):
         return tuple(io.imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
 
 
-def export_tif_file(fname, array, datatype=dtype("uint8"), fit=False, **kwargs):
-    from skimage import io
+def export_tif_file(fname, array, datatype=dtype("uint16"), fit=False, **kwargs):
+    from tifffile import imwrite
 
     if datatype is None:
         datatype = array.dtype
@@ -34,7 +34,7 @@ def export_tif_file(fname, array, datatype=dtype("uint8"), fit=False, **kwargs):
             normalization_coefficient = np.divide(float(np.iinfo(datatype).max), np.amax(array))
             array *= normalization_coefficient
 
-    io.imsave(fname, array.astype(datatype), **kwargs)
+    imwrite(fname+".tif", array.astype(datatype), **kwargs)
 
 
 def find_minimal_shape(*array):

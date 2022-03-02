@@ -42,11 +42,15 @@ def rbf_regression(
         return grid.to_array(mean), grid.to_array(var)
 
 
-def rbf_regression_over_large_array(x, threshold, lengthscales=1., **kwargs):
+def rbf_regression_over_large_array(x, threshold, lengthscales=1., step=None, **kwargs):
     from core import LargeArrayIterator
-    output_mean = np.empty_like(x)
-    output_var = np.empty_like(x)
-    for slices in LargeArrayIterator(x, 50, np.ceil(5*lengthscales)):
+    output_mean = np.empty_like(x, dtype=float)
+    output_var = np.empty_like(x, dtype=float)
+    if step is not None:
+        index_lengthscales = np.array(lengthscales) / step
+    else:
+        index_lengthscales = lengthscales
+    for slices in LargeArrayIterator(x, 50, np.ceil(5*index_lengthscales)):
         output_mean[slices.evaluate], output_var[slices.evaluate] = rbf_regression(
             x[slices.consider], threshold, evaluate_at=slices.evaluate, considered_at=slices.consider, **kwargs
         )

@@ -6,6 +6,7 @@ dependencies:
   - pip
   - scikit-learn
   - scikit-image
+  - tqdm
   - pip:
     - tensorflow
     - gpflow

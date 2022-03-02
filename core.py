@@ -180,18 +180,23 @@ class AnalysisSlices:
 
 
 class LargeArrayIterator:
-    def __init__(self, array, step_size, epsilon=0):
-        step_size = np.broadcast_to(step_size, array.ndim)
+    def __init__(self, array, step_size, epsilon=0, method="grid"):
         shape = array.shape
-        index_lookup_table = []
-        for dim in range(array.ndim):
-            index_lookup_table.append(np.append(np.arange(0, shape[dim] - 1, step_size[dim], dtype=int), shape[dim]))
 
-        self.indices_lower = Grid([coords[:-1] for coords in index_lookup_table]).get_list()
-        self.indices_upper = Grid([coords[1:] for coords in index_lookup_table]).get_list()
+        if method == "grid":
+            index_lookup_table = []
+            step_size = np.broadcast_to(step_size, array.ndim)
+            for dim in range(array.ndim):
+                index_lookup_table.append(
+                    np.append(np.arange(0, shape[dim] - 1, step_size[dim], dtype=int), shape[dim]))
+            self.indices_lower = Grid([coords[:-1] for coords in index_lookup_table]).get_list()
+            self.indices_upper = Grid([coords[1:] for coords in index_lookup_table]).get_list()
 
-        self.considered_lower = np.maximum(self.indices_lower - epsilon, 0)
-        self.considered_upper = np.minimum(self.indices_upper + epsilon, shape)
+            self.considered_lower = np.maximum(self.indices_lower - epsilon, 0)
+            self.considered_upper = np.minimum(self.indices_upper + epsilon, shape)
+
+        if method == "count":
+            raise NotImplementedError
 
     def __iter__(self):
         self._slice_num = 0
