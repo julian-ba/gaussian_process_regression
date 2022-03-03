@@ -1,5 +1,4 @@
 # Convenience functions
-import numbers
 
 import numpy as np
 
@@ -17,9 +16,32 @@ def exactly_2d(x):
     return output_array
 
 
+class GridInfo:
+    def __init__(self, init, step=None):
+        if all([isinstance(i, slice) for i in init]):
+            self._initialize_from_slices(init)
+
+        elif all([isinstance(i, int) for i in init]):
+            init = tuple(init)
+            self._initialize_from_shape(init)
+
+        elif all([isinstance(i, np.ndarray) for i in init]):
+            self._initialize_from_axes(init)
+
+        elif isinstance(init, np.ndarray):
+            self._initialize_from_shape(init.shape)
+
+        else:
+            raise ValueError
+
+        self.shape = tuple(len(axis) for axis in self.axes)
+        self.ndim = len(self.axes)
+        self.size = np.prod(self.shape)
+
+
 class Grid:
     def convert_to_coords(self, step):
-        step = np.broadcast_to(step, self.ndim)
+        step = np.broadcast_to(step, (self.ndim,))
         for i in range(self.ndim):
             self.axes[i] *= step[i]
         self.indexable = False
@@ -180,11 +202,12 @@ class AnalysisSlices:
 
 
 class LargeArrayIterator:
-    def __init__(self, array, step_size, epsilon=0, method="grid"):
+    def __init__(self, array, step_size, epsilon=None, method="grid", threshold=None):
         shape = array.shape
 
         if method == "grid":
             index_lookup_table = []
+            assert np.all(step_size)
             step_size = np.broadcast_to(step_size, array.ndim)
             for dim in range(array.ndim):
                 index_lookup_table.append(
@@ -195,8 +218,8 @@ class LargeArrayIterator:
             self.considered_lower = np.maximum(self.indices_lower - epsilon, 0)
             self.considered_upper = np.minimum(self.indices_upper + epsilon, shape)
 
-        if method == "count":
-            raise NotImplementedError
+        if method == "half":
+            dim_sizes = np.array(array.shape) * np.array(step_size)
 
     def __iter__(self):
         self._slice_num = 0

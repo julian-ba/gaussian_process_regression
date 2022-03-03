@@ -24,8 +24,8 @@ def gaussian(mean, std):
     return gaussian_with_mean_and_var.pdf
 
 
-def radial_gaussian(mean, std):
-    return lambda x: to_radial_function(gaussian(0, std))(x - mean)
+def radial_gaussian(std):
+    return lambda x: to_radial_function(gaussian(0, std))(x)
 
 
 def bandwidth_rule_of_thumb(n, std):
@@ -39,13 +39,27 @@ def linear(a, b):
     return lambda x: (x - a)/b
 
 
-def kernel_density_estimation(x, h, kernel, epsilon, step=None):
+def kernel_density_estimation(x, kernel, eps=1e-9, step=None):
     from scipy.signal import convolve
-
-    epsilon = np.broadcast_to(epsilon, x.ndim)
+    if step is None:
+        epsi = 0
+        while kernel(epsi) > eps:
+            epsi += 1
+        epsilon = np.full(x.ndim, epsi)
+    else:
+        step_min = np.min(np.array(step))
+        epsi = 0
+        while kernel(epsi) > eps:
+            epsi += step_min
+        try:
+            assert epsi > 0
+            epsilon = np.ceil(epsi/np.array(step)).astype(int)
+        except AssertionError:
+            epsilon = 0
     slices = [slice(-epsi, epsi+1) for epsi in epsilon]
     grid = Grid(slices, step)
     evaluate = grid.get_list()
+    print(evaluate.shape)
     convolution_matrix = grid.to_array(kernel(evaluate))
     return convolve(x, convolution_matrix, "same")
 

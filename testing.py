@@ -78,30 +78,32 @@ def euclidean_distribution_distance(x, y):
     return np.sqrt(np.sum(np.square(x - y)))
 
 
-def cross_val_run(fish, n, output_image=False):
+def cross_val_run(fish_fnames, n, output_image=False):
     from gaussian_process_regression import rbf_regression_over_large_array
     from kernel_density_estimation import gaussian_kernel_density_estimation
-    from image_processing import crop_arrays_to_same_shape, export_tif_file
-    ffish = crop_arrays_to_same_shape(*fish)
-    fish_shape = ffish[0].shape
+    from image_processing import array_crops, export_tif_file, import_tif_file
+    ffish_crops = array_crops(*import_tif_file(*fish_fnames))
+    fish_shape = shape_from_slice(*ffish_crops[0])
     middle_z = fish_shape[0]//2
     output = np.empty((n, 2))
     for i in range(n):
-        splits1, splits2 = random_indices(2, len(ffish))
+        splits1, splits2 = random_indices(2, len(fish_fnames))
 
         agglomerated_fish1 = np.zeros(fish_shape)
         for j in splits1:
-            agglomerated_fish1 += ffish[j]
+            agglomerated_fish1 += import_tif_file(fish_fnames[j], datatype=float)[ffish_crops[j]]
         agglomerated_fish1 /= len(splits1)
-        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 100, step=(1, 20, 20))[0]
-        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (5, 15, 15))
 
         agglomerated_fish2 = np.zeros(fish_shape)
         for j in splits2:
-            agglomerated_fish2 += ffish[j]
+            agglomerated_fish2 += import_tif_file(fish_fnames[j], datatype=float)[ffish_crops[j]]
         agglomerated_fish2 /= len(splits2)
-        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 100, step=(1, 20, 20))[0]
-        kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (5, 15, 15))
+        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 25, step=(20, 1, 1))[0]
+        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (1, 20, 20))
+        del agglomerated_fish1
+        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 25, step=(20, 1, 1))[0]
+        kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (1, 20, 20))
+        del agglomerated_fish2
         if output_image:
             if i < 2:
                 export_tif_file("gpr_run{}(1)".format(i), gpr1[middle_z], fit=True)
@@ -111,6 +113,7 @@ def cross_val_run(fish, n, output_image=False):
 
         output[i, 0] = norm_1(gpr1, gpr2)
         output[i, 1] = norm_1(kde1, kde2)
+        del gpr1, gpr2, kde1, kde2
 
     return output
 

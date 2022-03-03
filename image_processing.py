@@ -15,10 +15,16 @@ fish_fnames = [
 
 def import_tif_file(*fname, datatype=None, **kwargs):
     from skimage import io
-    if datatype is None:
-        return tuple(io.imread(fnamei, **kwargs) for fnamei in fname)
+    if len(fname) == 1:
+        if datatype is None:
+            return io.imread(*fname, **kwargs)
+        else:
+            return io.imread(*fname, **kwargs).astype(datatype)
     else:
-        return tuple(io.imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
+        if datatype is None:
+            return tuple(io.imread(fnamei, **kwargs) for fnamei in fname)
+        else:
+            return tuple(io.imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
 
 
 def export_tif_file(fname, array, datatype=dtype("uint16"), fit=False, **kwargs):
@@ -43,11 +49,11 @@ def find_minimal_shape(*array):
     return minimal_shape
 
 
-def crop_arrays_to_same_shape(*array):
+def array_crops(*array):
     shape = np.array(find_minimal_shape(*array))
     shapes = [i.shape for i in array]
     image_slices = []
     for _shape in shapes:
         q, r = np.divmod(np.array(_shape) - shape, 2, dtype=int)
         image_slices.append(tuple(slice(q[i], _shape[i]-q[i]-r[i]) for i in range(len(q))))
-    return tuple(array[i][image_slices[i]] for i in range(len(array)))
+    return tuple(image_slices)

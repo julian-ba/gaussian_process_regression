@@ -50,9 +50,10 @@ def rbf_regression_over_large_array(x, threshold, lengthscales=1., step=None, **
         index_lengthscales = np.array(lengthscales) / step
     else:
         index_lengthscales = lengthscales
-    for slices in LargeArrayIterator(x, 50, np.ceil(5*index_lengthscales)):
+    for slices in LargeArrayIterator(x, (1, 150, 150), np.ceil(5*index_lengthscales)):
         output_mean[slices.evaluate], output_var[slices.evaluate] = rbf_regression(
-            x[slices.consider], threshold, evaluate_at=slices.evaluate, considered_at=slices.consider, **kwargs
+            x[slices.consider], threshold, lengthscales,
+            evaluate_at=slices.evaluate, considered_at=slices.consider, **kwargs
         )
 
     return output_mean, output_var
