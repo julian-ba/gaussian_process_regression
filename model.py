@@ -10,7 +10,7 @@ class DataSet:
             self.x = exactly_2d(x)
         if fx is not None:
             self.fx = exactly_2d(fx)
-        assert len(self.x) == len(self.fx), "x and fx must be the same length after reshaping into a matrix."
+        assert len(self.x) == len(self.fx), "x and fx must have the same length after reshaping into a matrix."
         self.n = len(self.x)
         self.dim = self.x.shape[1]
         self.output_dim = self.fx.shape[1]

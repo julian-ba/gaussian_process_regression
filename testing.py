@@ -1,11 +1,36 @@
 from core import *
+from gaussian_process_regression import rbf_regression_model
 import numpy as np
-import simulated_data as sd
-from gaussian_process_regression import rbf_regression
+import scipy.stats as stats
+
+
+def smooth_data(n, loc=0., scale=1., dim=None):
+    # Returns n sample points from a multivariate Gaussian distribution distributed according to loc and scale.
+    # The distributions in each dimension are independent.
+    loc, scale = np.broadcast_arrays(loc, scale)
+
+    array = np.empty((n, loc.size))
+    for i in range(loc.size):
+        array[:, i] = stats.norm.rvs(size=n, loc=loc[i], scale=scale[i])
+
+    return array
+
+
+def jagged_data(n, loc=0., scale=1, dim=None):
+    # Generates n points uniformly distributed over a hyper-cuboid. loc is the lower bound of the distribution (resp.
+    # dimension), loc+scale is the upper bound.
+    loc, scale = np.broadcast_arrays(loc, scale)
+
+    array = np.empty((n, loc.size))
+    for i in range(loc.size):
+        array[:, i] = stats.uniform.rvs(size=n, loc=loc[i], scale=scale[i])
+
+    return array
+
 
 
 def time_model_1d(
-        repetitions, x, fx=sd.smooth_data, return_seconds=False, regressor=rbf_regression, **kwargs
+        repetitions, x, fx=smooth_data, return_seconds=False, regressor=rbf_regression_model, **kwargs
 ):
     import time
     # Create repetitions-# of model_type of data x and return the time in ns or s taken for each resp. repetition.
@@ -33,6 +58,7 @@ def time_model_1d(
         return output_array * 1e-9
     else:
         return output_array
+
 
 
 def run_test_1d(repetitions, lower_n, upper_n, step=1, *args, **kwargs):
@@ -83,39 +109,74 @@ def cross_val_run(fish_fnames, n, output_image=False):
     from kernel_density_estimation import gaussian_kernel_density_estimation
     from image_processing import array_crops, export_tif_file, import_tif_file
     ffish_crops = array_crops(*import_tif_file(*fish_fnames))
-    fish_shape = shape_from_slice(*ffish_crops[0])
-    middle_z = fish_shape[0]//2
+    fish_shape = shape_from_slice(*ffish_crops[0][1:])
+    middle_z = [(i[0].stop - i[0].start)//2 for i in ffish_crops]
     output = np.empty((n, 2))
     for i in range(n):
         splits1, splits2 = random_indices(2, len(fish_fnames))
 
-        agglomerated_fish1 = np.zeros(fish_shape)
+        agglomerated_fish = np.zeros(fish_shape)
         for j in splits1:
-            agglomerated_fish1 += import_tif_file(fish_fnames[j], datatype=float)[ffish_crops[j]]
-        agglomerated_fish1 /= len(splits1)
+            agglomerated_fish += import_tif_file(fish_fnames[j], datatype=float, key=middle_z[j])[ffish_crops[j][1:]]
+        agglomerated_fish /= len(splits1)
+        gpr = rbf_regression_over_large_array(agglomerated_fish, 0.05, 20, step=(1, 1))[0]
+        kde = gaussian_kernel_density_estimation(agglomerated_fish, (20, 20))
 
-        agglomerated_fish2 = np.zeros(fish_shape)
+        agglomerated_fish = np.zeros(fish_shape)
         for j in splits2:
-            agglomerated_fish2 += import_tif_file(fish_fnames[j], datatype=float)[ffish_crops[j]]
-        agglomerated_fish2 /= len(splits2)
-        gpr1 = rbf_regression_over_large_array(agglomerated_fish1, 0.05, 25, step=(20, 1, 1))[0]
-        kde1 = gaussian_kernel_density_estimation(agglomerated_fish1, (1, 20, 20))
-        del agglomerated_fish1
-        gpr2 = rbf_regression_over_large_array(agglomerated_fish2, 0.05, 25, step=(20, 1, 1))[0]
-        kde2 = gaussian_kernel_density_estimation(agglomerated_fish2, (1, 20, 20))
-        del agglomerated_fish2
+            agglomerated_fish += import_tif_file(fish_fnames[j], datatype=float, key=middle_z[j])[ffish_crops[j][1:]]
+        agglomerated_fish /= len(splits2)
         if output_image:
-            if i < 2:
-                export_tif_file("gpr_run{}(1)".format(i), gpr1[middle_z], fit=True)
-                export_tif_file("gpr_run{}(2)".format(i), gpr2[middle_z], fit=True)
-                export_tif_file("kde_run{}(1)".format(i), kde1[middle_z], fit=True)
-                export_tif_file("kde_run{}(2)".format(i), kde2[middle_z], fit=True)
+            if i < 4:
+                export_tif_file("figures/run{}_gpr".format(i), gpr, fit=True)
+                export_tif_file("figures/run{}_kde".format(i), kde, fit=True)
 
-        output[i, 0] = norm_1(gpr1, gpr2)
-        output[i, 1] = norm_1(kde1, kde2)
-        del gpr1, gpr2, kde1, kde2
+        output[i, 0] = norm_1(gpr, agglomerated_fish)
+        output[i, 1] = norm_1(kde, agglomerated_fish)
 
     return output
+
+
+def optimize_parameters(fish_fnames, func, var_kwargs, const_kwargs=None, iterations=10, output=False):
+    from image_processing import array_crops, shape_from_slice, import_tif_file, export_tif_file
+    from tqdm import tqdm
+    if const_kwargs is None:
+        const_kwargs = {}
+    ordered_keys = list(var_kwargs.keys())
+    values = list(var_kwargs.values())
+    grid = Grid(values)
+    param_score = np.empty(len(grid))
+    ffish_crops = array_crops(*import_tif_file(*fish_fnames))
+    ffish_shape = shape_from_slice(*ffish_crops[0][1:])
+    middle_z = [(i[0].stop - i[0].start) // 2 for i in ffish_crops]
+    num = 0
+    lst = grid.get_list()
+    for i in tqdm(lst):
+        kwargs_i = {ordered_keys[j]: i[j] for j in range(grid.ndim)}
+        kwargs_i.update(const_kwargs)
+        for j in range(iterations):
+            splits1, splits2 = random_indices(2, len(fish_fnames))
+            agglomerated_fish = np.zeros(ffish_shape)
+            for k in splits1:
+                agglomerated_fish += import_tif_file(fish_fnames[k], key=middle_z[k])[ffish_crops[k][1:]]
+            agglomerated_fish /= len(splits1)
+            prediction = func(agglomerated_fish, **kwargs_i)
+            if output and j==0:
+                export_tif_file("figures/optimization_of_{}_at_params{}".format(func.__name__, kwargs_i.values()), prediction, fit=True)
+
+            agglomerated_fish = np.zeros(ffish_shape)
+            for k in splits2:
+                agglomerated_fish += import_tif_file(fish_fnames[k], key=middle_z[k])[ffish_crops[k][1:]]
+            agglomerated_fish /= len(splits2)
+
+            param_score[num] += norm_1(prediction, agglomerated_fish)
+        num += 1
+    param_score /= iterations
+    dtype = [(key, var_kwargs[key].dtype) for key in ordered_keys]
+    dtype.append(("score", param_score.dtype))
+    dtype = np.dtype(dtype)
+    lst = np.hstack((lst, exactly_2d(param_score)))
+    return np.array([tuple(i) for i in lst[:]], dtype=dtype)
 
 
 def average_arrays(array, ratio, threshold, threshold1=None):

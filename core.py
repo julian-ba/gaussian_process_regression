@@ -16,29 +16,6 @@ def exactly_2d(x):
     return output_array
 
 
-class GridInfo:
-    def __init__(self, init, step=None):
-        if all([isinstance(i, slice) for i in init]):
-            self._initialize_from_slices(init)
-
-        elif all([isinstance(i, int) for i in init]):
-            init = tuple(init)
-            self._initialize_from_shape(init)
-
-        elif all([isinstance(i, np.ndarray) for i in init]):
-            self._initialize_from_axes(init)
-
-        elif isinstance(init, np.ndarray):
-            self._initialize_from_shape(init.shape)
-
-        else:
-            raise ValueError
-
-        self.shape = tuple(len(axis) for axis in self.axes)
-        self.ndim = len(self.axes)
-        self.size = np.prod(self.shape)
-
-
 class Grid:
     def convert_to_coords(self, step):
         step = np.broadcast_to(step, (self.ndim,))
@@ -46,6 +23,7 @@ class Grid:
             self.axes[i] *= step[i]
         self.indexable = False
         del self.slices
+        self._update_properties()
 
     def _initialize_from_shape(self, shape):
         slices = [slice(i) for i in shape]
@@ -62,15 +40,38 @@ class Grid:
             if slice_.step is not None:
                 kwargs["step"] = slice_.step
             list_of_kwargs.append(kwargs)
-        self.axes = [np.arange(**kwargs) for kwargs in list_of_kwargs]
         self.slices = list(slices)
-        self.indexable = True
 
     def _initialize_from_axes(self, axes):
         self.axes = axes
         self.indexable = False
 
+    def _update_properties(self):
+        if self.indexable:
+            self.ndim = len(self.slices)
+            self.shape = []
+            for slice_ in self.slices:
+                if slice_.step is None:
+                    step = 1
+                else:
+                    step = slice_.step
+                if slice.start is None:
+                    start = 0
+                else:
+                    start = slice_.start
+                self.shape.append((slice_.stop - start) // step)
+            self.slices = tuple(self.slices)
+        else:
+            self.ndim = len(self.axes)
+            self.shape = tuple(len(axis) for axis in self.axes)
+        self.size = np.prod(self.shape)
+
     def __init__(self, init, step=None):
+        self.indexable = True
+        self.size = None
+        self.ndim = None
+        self.shape = None
+
         if all([isinstance(i, slice) for i in init]):
             self._initialize_from_slices(init)
 
@@ -78,21 +79,22 @@ class Grid:
             init = tuple(init)
             self._initialize_from_shape(init)
 
-        elif all([isinstance(i, np.ndarray) for i in init]):
-            self._initialize_from_axes(init)
-
         elif isinstance(init, np.ndarray):
             self._initialize_from_shape(init.shape)
+
+        elif all([isinstance(i, np.ndarray) for i in init]):
+            self._initialize_from_axes(init)
 
         else:
             raise ValueError
 
-        self.shape = tuple(len(axis) for axis in self.axes)
-        self.ndim = len(self.axes)
-        self.size = np.prod(self.shape)
+        self._update_properties()
 
         if step is not None:
             self.convert_to_coords(step)
+
+    def __len__(self):
+        return self.size
 
     def get_array(self, dtype=None):
         if self.indexable:
@@ -112,10 +114,24 @@ class Grid:
         return self.get_array(dtype).reshape((-1, self.ndim))
 
     def get_axis(self, *i, dtype=None):
-        if dtype is not None:
-            return tuple(self.axes[idx].astype(dtype) for idx in i)
+        if self.indexable:
+            if len(i) == 1:
+                return np.arange(self.slices[i[0]].start, self.slices[i[0]].stop, self.slices[i[0]].step)
+            else:
+                return tuple(
+                    np.arange(self.slices[idx].start, self.slices[idx].stop, self.slices[idx].step) for idx in i
+                )
         else:
-            return tuple(self.axes[idx] for idx in i)
+            if dtype is not None:
+                if len(i) == 1:
+                    self.axes[i[0]].astype(dtype)
+                else:
+                    return tuple(self.axes[idx].astype(dtype) for idx in i)
+            else:
+                if len(i) == 1:
+                    return self.axes[i[0]]
+                else:
+                    return tuple(self.axes[idx] for idx in i)
 
     def to_array(self, points):
         points = exactly_2d(np.array(points))
@@ -157,8 +173,7 @@ def sparsify(
     else:
         grid = Grid(slices, step)
 
-    coordinate_array = grid.get_array()
-    sparse_coords = coordinate_array[indices]
+    sparse_coords = grid.get_array()[indices]
 
     if dtype_sparse_coords is not None:
         sparse_coords = sparse_coords.astype(dtype_sparse_coords)
@@ -202,11 +217,13 @@ class AnalysisSlices:
 
 
 class LargeArrayIterator:
-    def __init__(self, array, step_size, epsilon=None, method="grid", threshold=None):
+    def __init__(self, array, step_size=None, epsilon=None, method="grid"):
         shape = array.shape
 
         if method == "grid":
             index_lookup_table = []
+            if step_size is None:
+                step_size = tuple([1]*array.ndim)
             assert np.all(step_size)
             step_size = np.broadcast_to(step_size, array.ndim)
             for dim in range(array.ndim):
@@ -219,7 +236,11 @@ class LargeArrayIterator:
             self.considered_upper = np.minimum(self.indices_upper + epsilon, shape)
 
         if method == "half":
+            raise NotImplementedError
             dim_sizes = np.array(array.shape) * np.array(step_size)
+
+    def __len__(self):
+        return len(self.indices_lower)
 
     def __iter__(self):
         self._slice_num = 0
@@ -238,3 +259,14 @@ class LargeArrayIterator:
                 lower_consider=self.considered_lower[old_slice_num],
                 upper_consider=self.considered_upper[old_slice_num]
             )
+
+    def __getitem__(self, item):
+        assert isinstance(item, int)
+        if item > len(self):
+            raise ValueError
+        return AnalysisSlices(
+            lower_evaluate=self.indices_lower[item],
+            upper_evaluate=self.indices_upper[item],
+            lower_consider=self.considered_lower[item],
+            upper_consider=self.considered_upper[item]
+        )

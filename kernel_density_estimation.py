@@ -1,6 +1,15 @@
 from core import *
 
 
+def format_function(func):
+    def function(x):
+        out = np.empty(len(x))
+        for xi in range(len(x)):
+            out[xi] = func(xi)
+        return exactly_2d(out)
+    return function
+
+
 def euclidean_norm(x):
     return np.sqrt(np.sum(np.square(x)))
 
@@ -21,7 +30,7 @@ def find_bounds_for_gaussian(sigma, epsilon=np.finfo(float).eps/2):
 def gaussian(mean, std):
     from scipy import stats
     gaussian_with_mean_and_var = stats.norm(loc=mean, scale=std)
-    return gaussian_with_mean_and_var.pdf
+    return lambda x: gaussian_with_mean_and_var.pdf
 
 
 def radial_gaussian(std):
@@ -59,7 +68,6 @@ def kernel_density_estimation(x, kernel, eps=1e-9, step=None):
     slices = [slice(-epsi, epsi+1) for epsi in epsilon]
     grid = Grid(slices, step)
     evaluate = grid.get_list()
-    print(evaluate.shape)
     convolution_matrix = grid.to_array(kernel(evaluate))
     return convolve(x, convolution_matrix, "same")
 

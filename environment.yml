@@ -3,10 +3,9 @@ dependencies:
   - python
   - numpy
   - matplotlib
-  - pip
-  - scikit-learn
-  - scikit-image
+  - tifffile
   - tqdm
+  - pip
   - pip:
     - tensorflow
     - gpflow

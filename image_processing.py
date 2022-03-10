@@ -14,17 +14,17 @@ fish_fnames = [
 
 
 def import_tif_file(*fname, datatype=None, **kwargs):
-    from skimage import io
+    from tifffile import imread
     if len(fname) == 1:
         if datatype is None:
-            return io.imread(*fname, **kwargs)
+            return imread(*fname, **kwargs)
         else:
-            return io.imread(*fname, **kwargs).astype(datatype)
+            return imread(*fname, **kwargs).astype(datatype)
     else:
         if datatype is None:
-            return tuple(io.imread(fnamei, **kwargs) for fnamei in fname)
+            return tuple(imread(fnamei, **kwargs) for fnamei in fname)
         else:
-            return tuple(io.imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
+            return tuple(imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
 
 
 def export_tif_file(fname, array, datatype=dtype("uint16"), fit=False, **kwargs):
@@ -34,13 +34,17 @@ def export_tif_file(fname, array, datatype=dtype("uint16"), fit=False, **kwargs)
         datatype = array.dtype
 
     if fit:
-        if np.all(array == 0):
+        out = array.copy()
+        if np.all(out == 0):
             pass
         else:
             normalization_coefficient = np.divide(float(np.iinfo(datatype).max), np.amax(array))
-            array *= normalization_coefficient
+            out *= normalization_coefficient
 
-    imwrite(fname+".tif", array.astype(datatype), **kwargs)
+    else:
+        out = array
+
+    imwrite(fname+".tif", out.astype(datatype), **kwargs)
 
 
 def find_minimal_shape(*array):

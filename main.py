@@ -1,8 +1,13 @@
-from testing import cross_val_run
-from image_processing import fish_fnames, import_tif_file
-from testing import cross_val_run
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
-from gaussian_process_regression import rbf_regression_over_large_array
+from testing import optimize_parameters
+from image_processing import fish_fnames
+import numpy as np
+from kernel_density_estimation import gaussian_kernel_density_estimation
+from matplotlib import pyplot as plt
+N = 50
 
-print(cross_val_run(fish_fnames, 5, output_image=True))
+array = optimize_parameters(fish_fnames, gaussian_kernel_density_estimation, {"sigma": np.linspace(0.5, 100, 50)}, iterations=N)
+plt.plot(array["sigma"], array["score"])
+plt.scatter(array["sigma"], array["score"])
+plt.xlabel("sigma")
+plt.ylabel("Score over {} iterations".format(N))
+plt.savefig("figures/parameter_optimization_kde.png")
