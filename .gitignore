@@ -1,5 +1,6 @@
 /figures/*.png
 /figures/*.tif
+/figures/*.pdf
 mathematical_foundations.synctex.gz
 mathematical_foundations.tex
 /.ipynb_checkpoints

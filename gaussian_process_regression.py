@@ -1,20 +1,26 @@
+import gpflow.models
 import numpy as np
 
 
-def rbf_regression_model(x, fx, lengthscales=1., variance=1., noise_value=None):
-    from gpflow import models, kernels
+def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., noise_value=None) -> gpflow.models.GPModel:
+    from gpflow import models, kernels, optimizers, set_trainable
     from core import exactly_2d
     from numpy import amax, abs
     x = exactly_2d(x=x)
     fx = exactly_2d(x=fx)
 
     if noise_value is None:
-        noise_value = amax(abs(fx), initial=0.001) * 0.2
+        noise_value = amax(abs(fx), initial=1e-20) * 0.2
     rbf_model = models.GPR(
         data=(x, fx),
         kernel=kernels.stationaries.SquaredExponential(variance=variance, lengthscales=lengthscales),
     )
     rbf_model.likelihood.variance.assign(noise_value)
+
+    set_trainable(rbf_model.kernel.lengthscales, False)
+
+    opti = optimizers.Scipy()
+    opti.minimize(rbf_model.training_loss, variables=rbf_model.trainable_variables)
 
     return rbf_model
 
@@ -26,7 +32,7 @@ def rbf_regression(
 ):
     from core import Grid, sparsify
     if evaluate_at is None:
-        grid = Grid(x)
+        grid = Grid(x, step=step)
     else:
         grid = Grid(evaluate_at, step=step)
     _x, fx = sparsify(x, threshold, slices=considered_at, step=step)
@@ -77,8 +83,7 @@ def maximum_likelihood_rbf_regression(x, threshold, step=None, evaluate_at=None,
 
     else:
         grid_list = grid.get_list(dtype=float)
-        mean = rbf_regression_model(_x, fx, **kwargs).predict_f(grid_list)[0]
-        mean = mean.numpy()
+        mean = rbf_regression_model(_x, fx, **kwargs).predict_f(grid_list)[0].numpy()
         return grid.to_array(mean)
 
 def maximum_likelihood_rbf_regression_over_large_array(

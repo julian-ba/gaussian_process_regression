@@ -1,14 +1,6 @@
 # Plotting functions for GPR such as plotting distribution parameters from GPR over 1-d and 2-d data
-
 import numpy as np
 from core import *
-import matplotlib.pyplot as plt
-
-
-def coord_list_and_meshgrid(*xi):
-    meshxi = np.meshgrid(*xi, indexing="xy")
-    coord_grid = np.reshape(coord_array(*xi), (-1, len(xi)), order="C")
-    return coord_grid, meshxi
 
 
 def data_plot_1d(ax, x, fx):
@@ -28,21 +20,15 @@ def model_plot_1d(ax, model, lower, upper):
     )
 
 
-def model_plot_2d(ax1, ax2, model, lower, upper):
-    if not hasattr(lower, "__getitem__"):
-        lower = [lower, lower]
-
-    if not hasattr(upper, "__getitem__"):
-        upper = [upper, upper]
-
-    x = np.linspace(lower[0], upper[0], 100)
-    y = np.linspace(lower[1], upper[1], 100)
-
-    plot_points, (xx, yy) = coord_list_and_meshgrid(x+0.5, y+0.5)
+def model_plot_2d(ax1, ax2, model, slices, step=None):
+    grid = Grid(slices, step=step)
+    plot_points = grid.get_list()
+    xx = grid.get_array()[..., 0]
+    yy = grid.get_array()[..., 1]
 
     sampled_function_mean, sampled_function_var = model.predict_f(plot_points)
-    sampled_function_mean = sampled_function_mean.numpy().reshape(len(x), len(y))
-    sampled_function_var = sampled_function_var.numpy().reshape(len(x), len(y))
+    sampled_function_mean = grid.to_array(sampled_function_mean.numpy())
+    sampled_function_var = grid.to_array(sampled_function_var.numpy())
     ax1.pcolormesh(xx, yy, sampled_function_mean)
     ax2.pcolormesh(xx, yy, sampled_function_var)
 
@@ -54,18 +40,37 @@ def sample_f_plot_1d(ax, model, lower, upper, n=10):
         ax.plot(plot_points, sampled_function, color="C0", linewidth=0.5)
 
 
-def sample_f_plot_2d(ax, model, lower, upper):
-    if not hasattr(lower, "__getitem__"):
-        lower = [lower, lower]
-
-    if not hasattr(upper, "__getitem__"):
-        upper = [upper, upper]
-
-    x = np.linspace(lower[0], upper[0], 100)
-    y = np.linspace(lower[1], upper[1], 100)
-
-    plot_points, (xx, yy) = coord_list_and_meshgrid(x, y)
+def sample_f_plot_2d(ax, model, slices, step=None):
+    grid = Grid(slices, step=step)
+    plot_points = grid.get_list()
+    xx = grid.get_array()[0]
+    yy = grid.get_array()[1]
 
     sampled_func = model.predict_f_samples(plot_points)
-    sampled_func = sampled_func.numpy().reshape(x, y)
+    sampled_func = grid.to_array(sampled_func.numpy())
     ax.plot_surface(xx, yy, sampled_func)
+
+
+def histogram_and_image_figure(prediction: np.ndarray, validation: np.ndarray, file_name: str):
+    from matplotlib import pyplot as plt
+    fig, axs = plt.subplots(nrows=2, ncols=2, constrained_layout=True, gridspec_kw={"width_ratios": [1, 3]})
+    ((prediction_histogram, prediction_image), (validation_histogram, validation_image)) = axs
+    if prediction.shape[0] < prediction.shape[0]:
+        prediction_array = prediction.T
+    else:
+        prediction_array = prediction
+    if validation.shape[0] < validation.shape[1]:
+        validation_array = validation.T
+    else:
+        validation_array = validation
+    vmin, vmax = (
+    min(prediction_array.amin(), validation_array.amin()), max(prediction_array.amax(), validation_array.amax()))
+    range_ = (vmin, vmax)
+    print(range_)
+    prediction_histogram.hist(prediction_array.ravel(), bins=40, range=range_, log=True)
+    prediction_histogram.set_title("prediction array histogram"),
+    validation_histogram.hist(validation_array.ravel(), bins=40, range=range_, log=True)
+    validation_histogram.set_title("validation array histogram")
+    prediction_image.imshow(prediction_array, vmin=vmin, vmax=vmax)
+    validation_image.imshow(validation_array, vmin=vmin, vmax=vmax)
+    fig.savefig(file_name)

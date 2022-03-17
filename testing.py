@@ -4,7 +4,7 @@ import numpy as np
 import scipy.stats as stats
 
 
-def smooth_data(n, loc=0., scale=1., dim=None):
+def smooth_data(n, loc=0., scale=1.):
     # Returns n sample points from a multivariate Gaussian distribution distributed according to loc and scale.
     # The distributions in each dimension are independent.
     loc, scale = np.broadcast_arrays(loc, scale)
@@ -16,7 +16,7 @@ def smooth_data(n, loc=0., scale=1., dim=None):
     return array
 
 
-def jagged_data(n, loc=0., scale=1, dim=None):
+def jagged_data(n, loc=0., scale=1) -> np.ndarray:
     # Generates n points uniformly distributed over a hyper-cuboid. loc is the lower bound of the distribution (resp.
     # dimension), loc+scale is the upper bound.
     loc, scale = np.broadcast_arrays(loc, scale)
@@ -104,6 +104,10 @@ def euclidean_distribution_distance(x, y):
     return np.sqrt(np.sum(np.square(x - y)))
 
 
+def weighted_distribution_distance(prediction, validation):
+    total = np.sum(np.abs(validation))
+    
+
 def cross_val_run(fish_fnames, n, output_image=False):
     from gaussian_process_regression import rbf_regression_over_large_array
     from kernel_density_estimation import gaussian_kernel_density_estimation
@@ -117,19 +121,19 @@ def cross_val_run(fish_fnames, n, output_image=False):
 
         agglomerated_fish = np.zeros(fish_shape)
         for j in splits1:
-            agglomerated_fish += import_tif_file(fish_fnames[j], datatype=float, key=middle_z[j])[ffish_crops[j][1:]]
+            agglomerated_fish += import_tif_file(fish_fnames[j], dtype=float, key=middle_z[j])[ffish_crops[j][1:]]
         agglomerated_fish /= len(splits1)
         gpr = rbf_regression_over_large_array(agglomerated_fish, 0.05, 20, step=(1, 1))[0]
         kde = gaussian_kernel_density_estimation(agglomerated_fish, (20, 20))
 
         agglomerated_fish = np.zeros(fish_shape)
         for j in splits2:
-            agglomerated_fish += import_tif_file(fish_fnames[j], datatype=float, key=middle_z[j])[ffish_crops[j][1:]]
+            agglomerated_fish += import_tif_file(fish_fnames[j], dtype=float, key=middle_z[j])[ffish_crops[j][1:]]
         agglomerated_fish /= len(splits2)
         if output_image:
             if i < 4:
-                export_tif_file("figures/run{}_gpr".format(i), gpr, fit=True)
-                export_tif_file("figures/run{}_kde".format(i), kde, fit=True)
+                export_tif_file("figures/run{}_gpr".format(i), gpr)
+                export_tif_file("figures/run{}_kde".format(i), kde)
 
         output[i, 0] = norm_1(gpr, agglomerated_fish)
         output[i, 1] = norm_1(kde, agglomerated_fish)
@@ -146,7 +150,7 @@ def optimize_parameters(fish_fnames, func, var_kwargs, const_kwargs=None, iterat
     values = list(var_kwargs.values())
     grid = Grid(values)
     param_score = np.empty(len(grid))
-    ffish_crops = array_crops(*import_tif_file(*fish_fnames))
+    ffish_crops = array_crops(*import_tif_file(*fish_fnames, ))
     ffish_shape = shape_from_slice(*ffish_crops[0][1:])
     middle_z = [(i[0].stop - i[0].start) // 2 for i in ffish_crops]
     num = 0
@@ -162,7 +166,7 @@ def optimize_parameters(fish_fnames, func, var_kwargs, const_kwargs=None, iterat
             agglomerated_fish /= len(splits1)
             prediction = func(agglomerated_fish, **kwargs_i)
             if output and j==0:
-                export_tif_file("figures/optimization_of_{}_at_params{}".format(func.__name__, kwargs_i.values()), prediction, fit=True)
+                export_tif_file(f"figures/optimization_{func.__name__}({num})", prediction)
 
             agglomerated_fish = np.zeros(ffish_shape)
             for k in splits2:

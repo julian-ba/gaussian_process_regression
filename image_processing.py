@@ -1,7 +1,7 @@
 from core import *
-from numpy import dtype
+import numpy as np
 
-fish_fnames = [
+FISH_FNAMES = [
     "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish10_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
     "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish11_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
     "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish12_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
@@ -13,47 +13,36 @@ fish_fnames = [
 ]
 
 
-def import_tif_file(*fname, datatype=None, **kwargs):
+def import_tif_file(*file_name: str, dtype=None, **kwargs):
     from tifffile import imread
-    if len(fname) == 1:
-        if datatype is None:
-            return imread(*fname, **kwargs)
+    if len(file_name) == 1:
+        if dtype is None:
+            return imread(*file_name, **kwargs)
         else:
-            return imread(*fname, **kwargs).astype(datatype)
+            return imread(*file_name, **kwargs).astype(dtype)
     else:
-        if datatype is None:
-            return tuple(imread(fnamei, **kwargs) for fnamei in fname)
+        if dtype is None:
+            return tuple(imread(file_name_i, **kwargs) for file_name_i in file_name)
         else:
-            return tuple(imread(fnamei, **kwargs).astype(datatype) for fnamei in fname)
+            return tuple(imread(file_name_i, **kwargs).astype(dtype) for file_name_i in file_name)
 
 
-def export_tif_file(fname, array, datatype=dtype("uint16"), fit=False, **kwargs):
+def export_tif_file(file_name: str, array: np.ndarray, dtype=None, **kwargs):
     from tifffile import imwrite
 
-    if datatype is None:
-        datatype = array.dtype
+    if dtype is None:
+        dtype = array.dtype
 
-    if fit:
-        out = array.copy()
-        if np.all(out == 0):
-            pass
-        else:
-            normalization_coefficient = np.divide(float(np.iinfo(datatype).max), np.amax(array))
-            out *= normalization_coefficient
-
-    else:
-        out = array
-
-    imwrite(fname+".tif", out.astype(datatype), **kwargs)
+    imwrite(file_name + ".tif", array.astype(dtype), **kwargs)
 
 
-def find_minimal_shape(*array):
+def find_minimal_shape(*array) -> tuple:
     shapes = np.stack([np.array(_array.shape) for _array in array])
     minimal_shape = np.amin(shapes, axis=0)
-    return minimal_shape
+    return tuple(minimal_shape)
 
 
-def array_crops(*array):
+def array_crops(*array) -> tuple:
     shape = np.array(find_minimal_shape(*array))
     shapes = [i.shape for i in array]
     image_slices = []

@@ -1,9 +1,11 @@
 # Convenience functions
-
 import numpy as np
+GRID_STEP_3D = (8., 0.406, 0.406)  # Step of testing data in microns, in order (delta z, delta x, delta y)
+GRID_STEP_2D = (0.406, 0.406)
+THRESHOLD = 0.05
 
 
-def exactly_2d(x):
+def exactly_2d(x: np.ndarray) -> np.ndarray:
     # Warning: This function does not necessarily behave as expected with arrays of dimension greater than 2. In this
     # case, it should only be used carefully.
     x = np.asarray(x)
@@ -17,13 +19,22 @@ def exactly_2d(x):
 
 
 class Grid:
-    def convert_to_coords(self, step):
+    def convert_to_coordinates(self, step):
         step = np.broadcast_to(step, (self.ndim,))
-        for i in range(self.ndim):
-            self.axes[i] *= step[i]
+        self.axes = []
+        for idx in range(self.ndim):
+            slice_ = self.slices[idx]
+            kwargs = {}
+            if slice_.start is not None:
+                kwargs["start"] = slice_.start
+            if slice_.stop is not None:
+                kwargs["stop"] = slice_.stop
+            if slice_.step is not None:
+                kwargs["step"] = slice_.step
+            self.axes.append(np.arange(**kwargs)*step[idx])
         self.indexable = False
-        del self.slices
-        self._update_properties()
+        self.slices = None
+        self._update_attributes()
 
     def _initialize_from_shape(self, shape):
         slices = [slice(i) for i in shape]
@@ -46,7 +57,7 @@ class Grid:
         self.axes = axes
         self.indexable = False
 
-    def _update_properties(self):
+    def _update_attributes(self):
         if self.indexable:
             self.ndim = len(self.slices)
             self.shape = []
@@ -55,7 +66,7 @@ class Grid:
                     step = 1
                 else:
                     step = slice_.step
-                if slice.start is None:
+                if slice_.start is None:
                     start = 0
                 else:
                     start = slice_.start
@@ -67,6 +78,8 @@ class Grid:
         self.size = np.prod(self.shape)
 
     def __init__(self, init, step=None):
+        self.axes = None
+        self.slices = None
         self.indexable = True
         self.size = None
         self.ndim = None
@@ -88,10 +101,10 @@ class Grid:
         else:
             raise ValueError
 
-        self._update_properties()
+        self._update_attributes()
 
         if step is not None:
-            self.convert_to_coords(step)
+            self.convert_to_coordinates(step)
 
     def __len__(self):
         return self.size
@@ -157,19 +170,19 @@ def get_ndim(*args):
     return dim
 
 
-def shape_from_slice(*slice_i):
+def shape_from_slice(*slice_i:slice) -> tuple:
     return tuple(i.stop - i.start for i in slice_i)
 
 
 def sparsify(
-        fx, threshold, slices=None, step=None, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float)
+        array:np.ndarray, threshold, slices=None, step=None, dtype_sparse_coords=np.dtype(float), dtype_sparse_fx=np.dtype(float)
 ):
     # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
     # values are greater than threshold.
-    indices = np.nonzero(fx >= threshold)
-    sparse_fx = exactly_2d(fx[indices])
+    indices = np.nonzero(array >= threshold)
+    sparse_fx = exactly_2d(array[indices])
     if slices is None:
-        grid = Grid(fx.shape, step)
+        grid = Grid(array.shape, step)
     else:
         grid = Grid(slices, step)
 
@@ -237,7 +250,6 @@ class LargeArrayIterator:
 
         if method == "half":
             raise NotImplementedError
-            dim_sizes = np.array(array.shape) * np.array(step_size)
 
     def __len__(self):
         return len(self.indices_lower)
