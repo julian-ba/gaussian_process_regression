@@ -26,16 +26,18 @@ def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., varianc
 
 
 def rbf_regression(
-        x, threshold,
+        *arrays: np.ndarray, threshold=None,
         variance=1., step=None, evaluate_at=None, considered_at=None, fill="var",
         **kwargs
-):
+) -> tuple:
     from core import Grid, sparsify
+    assert all([array.shape == arrays[0].shape for array in arrays])
+    shape = arrays[0].shape
     if evaluate_at is None:
-        grid = Grid(x, step=step)
+        grid = Grid(shape, step=step)
     else:
-        grid = Grid(evaluate_at, step=step)
-    _x, fx = sparsify(x, threshold, slices=considered_at, step=step)
+        grid = Grid(*evaluate_at, step=step)
+    _x, fx = sparsify(*arrays, threshold=threshold, slices=considered_at, step=step)
     if fx.size == 0:
         if fill == "var":
             fill = variance
@@ -49,10 +51,13 @@ def rbf_regression(
         return grid.to_array(mean), grid.to_array(var)
 
 
-def rbf_regression_over_large_array(x, threshold, lengthscales=1., step=None, it_step=None, **kwargs):
+def rbf_regression_over_large_array(*arrays: np.ndarray, threshold=0.05, lengthscales=1., step=None, it_step=None, **kwargs) -> tuple:
     from core import LargeArrayIterator
-    output_mean = np.empty_like(x, dtype=float)
-    output_var = np.empty_like(x, dtype=float)
+    assert all([array.shape == arrays[0].shape for array in arrays])
+    shape = arrays[0].shape
+    output_mean = np.empty(shape=shape, dtype=float)
+    output_var = np.empty(shape=shape, dtype=float)
+    ndim = len(shape)
     if step is not None:
         step = np.array(step)
         index_lengthscales = np.array(lengthscales) / step
@@ -61,23 +66,24 @@ def rbf_regression_over_large_array(x, threshold, lengthscales=1., step=None, it
     else:
         index_lengthscales = np.array(lengthscales).astype(int)
         if it_step is None:
-            it_step = np.array([150]*x.ndim)
-    it =  LargeArrayIterator(x, it_step, np.ceil(10*index_lengthscales))
+            it_step = np.array([150]*ndim)
+    it =  LargeArrayIterator(arrays[0], it_step, np.ceil(10 * index_lengthscales^2))
     for i in range(len(it)):
+        y = [xi[it[i].consider] for xi in arrays]
         output_mean[it[i].evaluate], output_var[it[i].evaluate] = rbf_regression(
-            x[it[i].consider], threshold, step=step, lengthscales=lengthscales,
+            *y, threshold=threshold, step=step, lengthscales=lengthscales,
             evaluate_at=it[i].evaluate, considered_at=it[i].consider, **kwargs
         )
     return output_mean, output_var
 
 
-def maximum_likelihood_rbf_regression(x, threshold, step=None, evaluate_at=None, considered_at=None, **kwargs):
+def maximum_likelihood_rbf_regression(*array, threshold, step=None, evaluate_at=None, considered_at=None, **kwargs):
     from core import Grid, sparsify
     if evaluate_at is None:
-        grid = Grid(x)
+        grid = Grid(array)
     else:
         grid = Grid(evaluate_at, step=step)
-    _x, fx = sparsify(x, threshold, slices=considered_at, step=step)
+    _x, fx = sparsify(*array, threshold, slices=considered_at, step=step)
     if fx.size == 0:
         return np.zeros(grid.shape)
 
@@ -87,10 +93,13 @@ def maximum_likelihood_rbf_regression(x, threshold, step=None, evaluate_at=None,
         return grid.to_array(mean)
 
 def maximum_likelihood_rbf_regression_over_large_array(
-        x, threshold, lengthscales=1., step=None, it_step=None, **kwargs
+        *array, threshold, lengthscales=1., step=None, it_step=None, **kwargs
 ):
     from core import LargeArrayIterator
-    output_mean = np.empty_like(x, dtype=float)
+    assert all(xi.shape == array[0].shape for xi in array)
+    shape = array[0].shape
+    ndim = len(shape)
+    output_mean = np.empty(shape=shape, dtype=float)
     if step is not None:
         step = np.array(step)
         index_lengthscales = np.array(lengthscales) / step
@@ -99,11 +108,11 @@ def maximum_likelihood_rbf_regression_over_large_array(
     else:
         index_lengthscales = np.array(lengthscales).astype(int)
         if it_step is None:
-            it_step = np.array([150] * x.ndim)
-    it = LargeArrayIterator(x, it_step, np.ceil(10 * index_lengthscales))
+            it_step = np.array([150] * ndim)
+    it = LargeArrayIterator(array, it_step, np.ceil(10 * index_lengthscales))
     for i in range(len(it)):
         output_mean[it[i].evaluate] = maximum_likelihood_rbf_regression(
-            x[it[i].consider], threshold, step=step, lengthscales=lengthscales,
+            array[it[i].consider], threshold, step=step, lengthscales=lengthscales,
             evaluate_at=it[i].evaluate, considered_at=it[i].consider, **kwargs
         )
     return output_mean
