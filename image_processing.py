@@ -1,16 +1,4 @@
-from core import *
 import numpy as np
-
-FISH_FNAMES = [
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish10_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish11_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish12_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish13_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish14_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish15_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish17_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif",
-    "C:/Users/jfb20/Desktop/test_funcMaps_fig2D_Batch_correlation_2regs_VARoption/save_fish18_fig2D_Batch_correlation_2regs_VARoption.mat_func.tif"
-]
 
 
 def import_tif_file(*file_name: str, dtype=None, zoom=False, **kwargs) -> np.ndarray | tuple:

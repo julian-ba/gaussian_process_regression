@@ -53,14 +53,28 @@ def norm_1(x, y):
     return np.sum(np.abs(x - y))
 
 
-def generate_gaussian_points_with_weights(mean, scale, num=5):
+def generate_gaussian_points_with_weights(mean, scale, distribution_representation="pdf", num=5):
     from scipy.stats import norm
-    n = num // 10 + 1
-    max_scale = np.amax(scale)*n*2
-    points = np.linspace(0., 2*max_scale, num=num) - max_scale + np.mean(mean)
-    mean_full_size = np.broadcast_to(mean, [num]+list(mean.shape))
-    scale_full_size = np.broadcast_to(scale, [num]+list(mean.shape))
-    return points, norm(loc=mean_full_size, scale=scale_full_size).pdf(points[:, np.newaxis, np.newaxis])
+    if distribution_representation == "pdf":
+        n = num // 10 + 1
+        max_scale = np.amax(scale)*n*2
+        points = np.linspace(0., 2*max_scale, num=num) - max_scale + np.mean(mean)
+        mean_full_size = np.broadcast_to(mean, [num]+list(mean.shape))
+        scale_full_size = np.broadcast_to(scale, [num]+list(mean.shape))
+        return points, norm(loc=mean_full_size, scale=scale_full_size).pdf(points[:, np.newaxis, np.newaxis])
+
+    elif distribution_representation == "cdf":
+        rounded_to_zero = norm(mean, scale).cdf(np.array([[[0.5]]]))
+        rounded_to_one = np.ones_like(rounded_to_zero) - rounded_to_zero
+        weights = np.stack(rounded_to_zero, rounded_to_one)
+        return np.array([0, 1]), weights
+
+    elif distribution_representation == "samples":
+        raise NotImplementedError
+
+    else:
+        raise ValueError("distribution_representation must be \"pdf\", \"cdf\", or \"samples\".")
+
 
 
 def _energy_distance_wrapper_between_gpr_and_validation_1d_according_to_num(num):
@@ -80,61 +94,64 @@ def energy_distance_for_gpr(validation_distributions, gpr_prediction, num:int=5)
     return energy_distance_ufunc(gpr_prediction[0], gpr_prediction[1], *validation_distributions)
 
 
-def optimized_cumulative_energy_distance_for_gpr(validation_distributions, gpr_prediction, num:int=5) -> float:
+def optimized_cumulative_energy_distance_for_gpr(validation_distributions, gpr_prediction, scoring_weight=1., **kwargs) -> float:
     from scipy.stats import energy_distance
-    points, weights = generate_gaussian_points_with_weights(gpr_prediction[0], gpr_prediction[1], num=num)
+    points, weights = generate_gaussian_points_with_weights(gpr_prediction[0], gpr_prediction[1], **kwargs)
     big_validation_array = np.stack(
         [np.isclose(validation_distribution, np.zeros_like(validation_distribution))
          for validation_distribution in validation_distributions]
     )
+    num = len(points)
+    distance = 0.
     zero = np.all(big_validation_array, axis=0)
     zero_where = tuple([slice(None, None, None)]+list(zero.nonzero()))
     num_of_zeros = len(zero_where[1])
     zero_weights = weights[zero_where].sum(axis=1)
-    distance_zero = energy_distance(points, [0], zero_weights, None) * num_of_zeros
+    distance += energy_distance(points, [0], zero_weights, None) * num_of_zeros * scoring_weight
 
     non_zero = np.logical_not(zero)
     non_zero_where = tuple([slice(None, None, None)] + list(non_zero.nonzero()))
-    distance_non_zero = 0.
     non_zero_gaussian_distributions = weights[non_zero_where]
     non_zero_validation_distribution = big_validation_array[non_zero_where]
     for idx in range(non_zero_validation_distribution.shape[1]):
         gaussian_weights = non_zero_gaussian_distributions[:, idx]
         if np.all(np.isclose(gaussian_weights, np.zeros(num))):
-            distance_non_zero += energy_distance(points, non_zero_validation_distribution[:, idx])
+            distance += energy_distance(points, non_zero_validation_distribution[:, idx])
         else:
-            distance_non_zero += energy_distance(
+            distance += energy_distance(
                 points, non_zero_validation_distribution[:, idx], gaussian_weights, None
             )
 
-    return distance_zero + distance_non_zero
+    return distance
 
 
-def optimized_cumulative_energy_distance_for_kde(validation_distributions, kde_predictions) -> float:
+def optimized_cumulative_energy_distance_for_kde(validation_distributions, kde_predictions, scoring_weight=1.) -> float:
     from scipy.stats import energy_distance
     big_validation_array = np.stack(
         [np.isclose(validation_distribution, np.zeros_like(validation_distribution))
          for validation_distribution in validation_distributions]
     )
     zero = np.all(big_validation_array, axis=0)
+    distance = 0.
     zero_where = tuple([slice(None, None, None)] + list(zero.nonzero()))
     big_kde_predictions = np.stack(kde_predictions)
     num_of_zeros = len(zero_where[1])
     points, weights = np.unique(big_kde_predictions[zero_where], return_counts=True)
-    distance_zero = energy_distance(points, [0], weights, None) * num_of_zeros
+    distance += energy_distance(points, [0], weights, None) * num_of_zeros * scoring_weight
+
+
 
     non_zero = np.logical_not(zero)
     non_zero_where = tuple([slice(None, None, None)] + list(non_zero.nonzero()))
-    distance_non_zero = 0.
     non_zero_kde_distributions = big_kde_predictions[non_zero_where]
     non_zero_validation_distribution = big_validation_array[non_zero_where]
     for idx in range(non_zero_validation_distribution.shape[1]):
-        points, weights = np.unique(non_zero_kde_distributions[:, idx])
-        distance_non_zero += energy_distance(
+        points, weights = np.unique(non_zero_kde_distributions[:, idx], return_counts=True)
+        distance += energy_distance(
             points, non_zero_validation_distribution[:, idx], weights, None
         )
 
-    return distance_zero + distance_non_zero
+    return distance
 
 
 def euclidean_distribution_distance(x, y):
@@ -175,7 +192,6 @@ def cross_val_run(file_names, n, output_image=False):
 
 
 def finite_sum(*array):
-    assert all([array_i.shape == array[0].shape for array_i in array])
     return np.stack(array).sum(axis=0)
 
 def average(*array):
@@ -239,7 +255,7 @@ def optimize_gpr(file_names, lengthscales_range:np.ndarray, iterations=10, outpu
         for num in range(iterations):
             splits1, splits2 = random_indices(2, len(file_names))
             testing_arrays = tuple(import_tif_file(file_names[k], key=middle_z[k])[image_crops[k][1:]] for k in splits1)
-            prediction_gpr = rbf_regression_over_large_array(*testing_arrays, lengthscales=lengthscales_range[idx])
+            prediction_gpr = rbf_regression_over_large_array(*testing_arrays, lengthscales=lengthscales_range[idx], method="slow")
             if output and (num == 0):
                 export_tif_file(f"figures/output_gpr({idx})", prediction_gpr[0])
             validation_arrays = tuple(
@@ -252,9 +268,9 @@ def optimize_gpr(file_names, lengthscales_range:np.ndarray, iterations=10, outpu
     return np.array([(lengthscales_range[idx], param_score[idx]) for idx in range(len(lengthscales_range))], dtype=dtype)
 
 
-def optimize_kde(file_names, sigma_range:np.ndarray, iterations=10):
+def optimize_kde(file_names, sigma_range:np.ndarray, iterations=10, output=False, **kwargs):
     # A modified optimization run, specifically for optimizing the sigma parameter in KDE
-    from image_processing import array_crops, import_tif_file
+    from image_processing import array_crops, import_tif_file, export_tif_file
     from kernel_density_estimation import gaussian_kernel_density_estimation
     from tqdm import trange
     param_score = np.zeros(len(sigma_range))
@@ -263,15 +279,16 @@ def optimize_kde(file_names, sigma_range:np.ndarray, iterations=10):
     for idx in trange(len(sigma_range)):
         for num in range(iterations):
             splits1, splits2 = random_indices(2, len(file_names))
-            testing_arrays = tuple(import_tif_file(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits1)
+            testing_arrays = tuple(import_tif_file(file_names[k], key=middle_z[k], dtype=np.dtype(float))[ffish_crops[k][1:]] for k in splits1)
             kde_predictions = [
                 gaussian_kernel_density_estimation(testing_array, sigma_range[idx]) for testing_array in testing_arrays
             ]
+            if output and (num == 0):
+                export_tif_file(f"figures/output_kde({idx})", kde_predictions[0])
             validation_arrays = tuple(
                 import_tif_file(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits2
             )
-            param_score[idx] += optimized_cumulative_energy_distance_for_kde(validation_arrays, kde_predictions)
+            param_score[idx] += optimized_cumulative_energy_distance_for_kde(validation_arrays, kde_predictions, **kwargs)
     param_score /= iterations
-    dtype = [("sigma", sigma_range.dtype), ("score", np.dtype(float))]
-    dtype = np.dtype(dtype)
+    dtype = np.dtype([("sigma", sigma_range.dtype), ("score", np.dtype(float))])
     return np.array([(sigma_range[idx], param_score[idx]) for idx in range(len(sigma_range))], dtype=dtype)

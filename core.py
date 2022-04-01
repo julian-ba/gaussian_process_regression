@@ -1,25 +1,26 @@
 # Convenience functions
 import numpy as np
-GRID_STEP_3D = (8., 0.406, 0.406)  # Step of testing data in microns, in order (delta z, delta x, delta y)
-GRID_STEP_2D = (0.406, 0.406)
-THRESHOLD = 0.05
+
+def _exactly_2d(array):
+    if array.ndim <= 1:
+        return array[:, np.newaxis]
+    elif array.ndim == 2:
+        return array
+    else:
+        return array.reshape((-1, array.shape[-1]))
 
 
-def exactly_2d(x: np.ndarray) -> np.ndarray:
+def exactly_2d(*array: np.ndarray) -> np.ndarray | tuple:
     # Warning: This function does not necessarily behave as expected with arrays of dimension greater than 2. In this
     # case, it should only be used carefully.
-    x = np.asarray(x)
-    if x.ndim <= 1:
-        output_array = x[:, np.newaxis]
-    elif x.ndim == 2:
-        output_array = x
+    if len(array) == 1:
+        return _exactly_2d(array[0])
     else:
-        output_array = x.reshape((-1, x.shape[-1]))
-    return output_array
+        return tuple(_exactly_2d(array_i) for array_i in array)
 
 
 class Grid:
-    def convert_to_coordinates(self, step=None, smallest=None):
+    def convert_to_coordinates(self, step=None):
         if step is None:
             step = 1.
         step = np.broadcast_to(step, (self.ndim,))
@@ -36,10 +37,6 @@ class Grid:
             self.axes.append(np.arange(**kwargs)*step[idx])
         self.indexable = False
         self.slices = None
-        if smallest is not None:
-            smallest = np.broadcast_to(step, (self.ndim,))
-            for i in range(self.ndim):
-                self.axes[i] += smallest[i]
         self._update_attributes()
 
     def _initialize_from_shape(self, shape):
@@ -83,7 +80,7 @@ class Grid:
             self.shape = tuple(len(axis) for axis in self.axes)
         self.size = np.prod(self.shape)
 
-    def __init__(self, *init, step=None, smallest=None):
+    def __init__(self, *init: slice | tuple | np.ndarray | int, step: None | tuple=None):
         self.axes = None
         self.slices = None
         self.indexable = True
@@ -94,8 +91,10 @@ class Grid:
         if all([isinstance(i, slice) for i in init]):
             self._initialize_from_slices(init)
 
-        elif all([isinstance(i, tuple) for i in init]):
-            init = init[0]
+        elif all([isinstance(i, tuple) for i in init]) and len(init) == 1:
+            self._initialize_from_shape(init[0])
+
+        elif all([isinstance(i, int) for i in init]):
             self._initialize_from_shape(init)
 
         elif all([isinstance(i, np.ndarray) for i in init]) and len(init) == 1:
@@ -109,8 +108,8 @@ class Grid:
 
         self._update_attributes()
 
-        if step is not None or smallest is not None:
-            self.convert_to_coordinates(step, smallest)
+        if step is not None:
+            self.convert_to_coordinates(step)
 
     def __len__(self):
         return self.size
@@ -129,8 +128,45 @@ class Grid:
         else:
             return out
 
+    @property
+    def array(self):
+        return self.get_array()
+
     def get_list(self, dtype=None):
-        return self.get_array(dtype).reshape((-1, self.ndim))
+        return self.get_array(dtype=dtype).reshape((-1, self.ndim))
+
+    @property
+    def list(self):
+        return self.get_list()
+
+    def __getitem__(self, item: int | slice | tuple):
+        from warnings import warn
+        warn("Prefer directly calling the list or array methods of Grid object.")
+        if isinstance(item, int) or isinstance(item, slice):
+            return self.list[item]
+        elif isinstance(item, tuple):
+            return self.array[item]
+        else:
+            raise ValueError(
+                "Item must be int, slice or tuple. If this function does not work correctly, "+
+                "try explicitly calling the array or list methods."
+            )
+
+    def __iter__(self):
+        self._list = self.list  # Saves self._list to avoid repeated calling of Grid.list
+        self._num = 0
+        return self
+
+    def __next__(self):
+        if self._num == self.size:
+            del self._list
+            del self._num
+            raise StopIteration
+        else:
+            old_num = self._num
+            self._num += 1
+            return self._list[old_num]
+
 
     def get_axis(self, *i, dtype=None):
         if self.indexable:
@@ -152,15 +188,17 @@ class Grid:
                 else:
                     return tuple(self.axes[idx] for idx in i)
 
-    def to_array(self, points):
-        points = exactly_2d(np.array(points))
-        assert points.size == self.size
-        return points.reshape(self.shape)
-
     @staticmethod
-    def from_points_to_array(shape, points):
-        points = exactly_2d(np.array(points))
-        return points.reshape(shape)
+    def from_points_to_array(shape, *point_list):
+        if len(point_list) == 1:
+            point_list = exactly_2d(*point_list)
+            return point_list.reshape(shape)
+        else:
+            point_list = exactly_2d(*point_list)
+            return tuple(points_i.reshape(shape) for points_i in point_list)
+
+    def to_array(self, *point_list):
+        return self.from_points_to_array(self.shape, *point_list)
 
 
 def get_ndim(*args):
@@ -181,26 +219,43 @@ def shape_from_slice(*slice_i:slice) -> tuple:
 
 
 def sparsify(
-        *array:np.ndarray, threshold=0.05, slices=None, step=None, dtype_sparse_coordinates=np.dtype(float), dtype_sparse_fx=np.dtype(float)
+        *array:np.ndarray,
+        threshold=0.05, slices: None | tuple=None, step: None | tuple=None, include_zeros:bool=True,
+        dtype_sparse_coordinates=np.dtype(float), dtype_sparse_fx=np.dtype(float)
 ):
     # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
     # values are greater than threshold.
-    indices = tuple(np.nonzero(array_i >= threshold) for array_i in array)
-    sparse_fx = np.concatenate(tuple(exactly_2d(array[idx][indices[idx]]) for idx in range(len(array))))
-    if slices is None:
-        grids = (Grid(array[i].shape, step=step) for i in range(len(array)))
+    assert isinstance(include_zeros, bool), "include_zeros MUST be bool."
+    if include_zeros:
+        indices = np.nonzero(np.any(np.stack(array) >= threshold, axis=0))
+        sparse_fx = np.concatenate([array_i[indices] for array_i in array])
+        if dtype_sparse_fx is not None:
+            sparse_fx = sparse_fx.astype(dtype_sparse_fx)
+
+        if slices is None:
+            grid = Grid(array[0].shape, step=step)
+        else:
+            grid = Grid(*slices, step=step)
+
+        sparse_coords = np.concatenate([grid.get_array(dtype_sparse_coordinates)[indices]] * len(array))
+        return sparse_coords, sparse_fx
     else:
-        grids = [Grid(*slices, step=step)] * len(array)
+        indices = tuple(np.nonzero(array_i >= threshold) for array_i in array)
+        sparse_fx = np.concatenate(tuple(exactly_2d(array[idx][indices[idx]]) for idx in range(len(array))))
+        if slices is None:
+            grids = (Grid(array[i].shape, step=step) for i in range(len(array)))
+        else:
+            grids = [Grid(*slices, step=step)] * len(array)
 
-    sparse_coords = np.concatenate(tuple(grids[idx].get_array()[indices[idx]] for idx in range(len(grids))))
+        sparse_coords = np.concatenate(tuple(grids[idx].get_array()[indices[idx]] for idx in range(len(grids))))
 
-    if dtype_sparse_coordinates is not None:
-        sparse_coords = sparse_coords.astype(dtype_sparse_coordinates)
+        if dtype_sparse_coordinates is not None:
+            sparse_coords = sparse_coords.astype(dtype_sparse_coordinates)
 
-    if dtype_sparse_fx is not None:
-        sparse_fx = sparse_fx.astype(dtype_sparse_fx)
+        if dtype_sparse_fx is not None:
+            sparse_fx = sparse_fx.astype(dtype_sparse_fx)
 
-    return sparse_coords, sparse_fx
+        return sparse_coords, sparse_fx
 
 
 class _AnalysisSlices:
@@ -211,8 +266,6 @@ class _AnalysisSlices:
         ndim = get_ndim(lower_evaluate, upper_evaluate, shape, epsilon, lower_consider, upper_consider, step)
         assert ndim > 0
         ndim_shape = (ndim,)
-        if epsilon is None:
-            epsilon = 0
         epsilon = np.array(epsilon)
         lower_evaluate = np.broadcast_to(lower_evaluate, ndim_shape).astype(int)
         if upper_evaluate is None:
@@ -221,41 +274,48 @@ class _AnalysisSlices:
         else:
             upper_evaluate = np.broadcast_to(upper_evaluate, ndim_shape).astype(int )
 
-        if lower_consider is None:
-            lower_consider = np.maximum(lower_evaluate - epsilon, 0)
-        lower_consider = np.broadcast_to(lower_consider, ndim_shape).astype(int)
+        self.consider = None
+        if np.any(epsilon) or upper_consider is not None or lower_consider is not None:
+            if lower_consider is None:
+                lower_consider = np.maximum(lower_evaluate - epsilon, 0)
+            lower_consider = np.broadcast_to(lower_consider, ndim_shape).astype(int)
 
-        if upper_consider is None:
-            upper_consider = np.minimum(upper_evaluate + epsilon, shape)
-        upper_consider = np.broadcast_to(upper_consider, ndim_shape).astype(int)
+            if upper_consider is None:
+                upper_consider = np.minimum(upper_evaluate + epsilon, shape)
+            upper_consider = np.broadcast_to(upper_consider, ndim_shape).astype(int)
+            self.consider = tuple(slice(lower_consider[dim], upper_consider[dim]) for dim in range(ndim))
 
         self.evaluate = tuple(slice(lower_evaluate[dim], upper_evaluate[dim]) for dim in range(ndim))
-        self.consider = tuple(slice(lower_consider[dim], upper_consider[dim]) for dim in range(ndim))
+
     def __repr__(self):
         return f"AnalysisSlices(evaluate: {repr(self.evaluate)}; consider: {repr(self.consider)})"
 
 
 class LargeArrayIterator:
-    def __init__(self, array, step_size=None, epsilon:int=0, method="grid"):
+    def __init__(self, array, grid_shape=None, epsilon:int=0, method:str= "grid"):
         shape = array.shape
 
         if method == "grid":
             index_lookup_table = []
-            if step_size is None:
-                step_size = tuple(np.ceil(np.array(array.shape) / 10).astype(np.dtype(int)))
-            assert np.all(step_size)
-            step_size = np.broadcast_to(step_size, array.ndim)
+            if grid_shape is None:
+                grid_shape = tuple(np.ceil(np.array(array.shape) / 10).astype(np.dtype(int)))
+            assert np.all(grid_shape)
+            grid_shape = np.broadcast_to(grid_shape, array.ndim)
             for dim in range(array.ndim):
                 index_lookup_table.append(
-                    np.append(np.arange(0, shape[dim] - 1, step_size[dim], dtype=int), shape[dim]))
+                    np.append(np.arange(0, shape[dim] - 1, grid_shape[dim], dtype=int), shape[dim]))
             self.indices_lower = Grid(*[coords[:-1] for coords in index_lookup_table]).get_list()
             self.indices_upper = Grid(*[coords[1:] for coords in index_lookup_table]).get_list()
 
-            self.considered_lower = np.maximum(self.indices_lower - epsilon, 0)
-            self.considered_upper = np.minimum(self.indices_upper + epsilon, shape)
+            if np.any(epsilon):
+                self.considered_lower = np.maximum(self.indices_lower - epsilon, 0)
+                self.considered_upper = np.minimum(self.indices_upper + epsilon, shape)
+            else:
+                self.considered_lower = [None] * len(self.indices_lower)
+                self.considered_upper = [None] * len(self.indices_lower)
 
         else:
-            raise NotImplementedError
+            raise NotImplementedError("Currently, only grid covering is implemented.")
 
     def __len__(self):
         return len(self.indices_lower)
@@ -278,8 +338,7 @@ class LargeArrayIterator:
                 upper_consider=self.considered_upper[old_slice_num]
             )
 
-    def __getitem__(self, item):
-        assert isinstance(item, int)
+    def __getitem__(self, item:int):
         if item > len(self):
             raise ValueError
         return _AnalysisSlices(

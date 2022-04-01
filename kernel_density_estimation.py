@@ -72,6 +72,6 @@ def kernel_density_estimation(x, kernel, eps=1e-9, step=None):
     return convolve(x, convolution_matrix, "same")
 
 
-def gaussian_kernel_density_estimation(x, sigma):
+def gaussian_kernel_density_estimation(array, sigma):
     from scipy.ndimage import gaussian_filter
-    return gaussian_filter(x, sigma)
+    return gaussian_filter(array, sigma)

@@ -2,12 +2,12 @@ from core import *
 
 
 def tif_pipeline_gpr(fname_in: str, fname_out_mean: str, fname_out_var: str, **kwargs):
-    from gaussian_process_regression import rbf_regression_over_large_array
+    from gaussian_process_regression import rbf_regression_over_large_array_fast
     import image_processing
 
     image = image_processing.import_tif_file(file_name=fname_in)
 
-    mean, var = rbf_regression_over_large_array(image, **kwargs)
+    mean, var = rbf_regression_over_large_array_fast(image, **kwargs)
 
     image_processing.export_tif_file(fname_out_mean, mean)
     image_processing.export_tif_file(fname_out_var, var)
