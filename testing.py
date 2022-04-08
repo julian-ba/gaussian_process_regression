@@ -90,13 +90,13 @@ def full_energy_distance(predictions, validations, points=None):
         if points is not None:
             return energy_distance(points, _prediction_and_validation[len(predictions):], _prediction_and_validation[:len(predictions)], None)
         else:
-            _distrib_points, _counting_weights = np.unique(_prediction_and_validation[len(predictions):], return_counts=True)
-            return energy_distance(_distrib_points, _prediction_and_validation[len(predictions):], _counting_weights, None)
+            return energy_distance(_prediction_and_validation[:len(predictions)], _prediction_and_validation[len(predictions):])
 
     distance = 0.
     predictions_and_validations = np.stack(list(predictions)+list(validations))
-    for point in predictions_and_validations[:]:
-        distance += energy_distance_1d(point)
+    for idx in Grid(predictions_and_validations.shape[1:]).list:
+        idx = tuple([slice(None, None, None)] + list(idx))
+        distance += energy_distance_1d(predictions_and_validations[idx])
     return distance
 
 
@@ -129,26 +129,33 @@ def optimized_cumulative_energy_distance_for_gpr(validation_distributions, gpr_p
     zero = np.all(big_validation_array, axis=0)
     zero_where = tuple([slice(None, None, None)]+list(zero.nonzero()))
     num_of_zeros = len(zero_where[1])
-    zero_weights = weights[zero_where].sum(axis=1)
-    distance += energy_distance(points, [0], zero_weights, None) * num_of_zeros * scoring_weight
+    if num_of_zeros == 0:
+        pass
+    else:
+        zero_weights = weights[zero_where].sum(axis=1)
+        distance += energy_distance(points, [0], zero_weights, None) * num_of_zeros * scoring_weight
 
     non_zero = np.logical_not(zero)
     non_zero_where = tuple([slice(None, None, None)] + list(non_zero.nonzero()))
+    num_of_non_zeros = len(non_zero_where[1])
     non_zero_gaussian_distributions = weights[non_zero_where]
     non_zero_validation_distribution = big_validation_array[non_zero_where]
-    for idx in range(non_zero_validation_distribution.shape[1]):
-        gaussian_weights = non_zero_gaussian_distributions[:, idx]
-        if np.all(np.isclose(gaussian_weights, np.zeros(num))):
-            distance += energy_distance(points, non_zero_validation_distribution[:, idx])
-        else:
-            distance += energy_distance(
-                points, non_zero_validation_distribution[:, idx], gaussian_weights, None
-            )
+    if num_of_non_zeros == 0:
+        pass
+    else:
+        for idx in range(num_of_non_zeros):
+            gaussian_weights = non_zero_gaussian_distributions[:, idx]
+            if np.all(np.isclose(gaussian_weights, np.zeros(num))):
+                distance += energy_distance(points, non_zero_validation_distribution[:, idx])
+            else:
+                distance += energy_distance(
+                    points, non_zero_validation_distribution[:, idx], gaussian_weights, None
+                )
 
     return distance
 
 
-def optimized_cumulative_energy_distance(validation_arrays, prediction_arrays, points:None|np.ndarray=None, scoring_weight=1.) -> float:
+def optimized_cumulative_energy_distance(prediction_arrays, validation_arrays, points:None|np.ndarray=None, scoring_weight=1.) -> float:
     from scipy.stats import energy_distance
     from collections.abc import Sequence
 
@@ -163,28 +170,35 @@ def optimized_cumulative_energy_distance(validation_arrays, prediction_arrays, p
         [slice(None, None, None)] + list(zero.nonzero())
     )
     num_of_zeros = len(zero_where[1])
-    big_prediction_array = np.stack(prediction_arrays)
     distance = 0.
-    if points is not None:
-        distance += energy_distance(points, [0], big_prediction_array[zero_where].sum(axis=1), None)
+    big_prediction_array = np.stack(prediction_arrays)
+    if num_of_zeros == 0:
+        pass
     else:
-        distrib_points, counting_weights = np.unique(big_prediction_array[zero_where], return_counts=True)
-        distance += energy_distance(distrib_points, [0], counting_weights, None) * num_of_zeros * scoring_weight
+        if points is not None:
+            distance += energy_distance(points, [0], big_prediction_array[zero_where].sum(axis=1), None)
+        else:
+            distrib_points, counting_weights = np.unique(big_prediction_array[zero_where], return_counts=True)
+            distance += energy_distance(distrib_points, [0], counting_weights, None) * num_of_zeros * scoring_weight
 
     non_zero = np.logical_not(zero)
     non_zero_where = tuple(
         [slice(None, None, None)] + list(non_zero.nonzero())
     )
-    non_zero_distributions = big_prediction_array[non_zero_where]
-    non_zero_validation_distribution = big_validation_array[non_zero_where]
-    for idx in range(non_zero_validation_distribution.shape[1]):
-        if points is not None:
-            distance += energy_distance(points, non_zero_validation_distribution[:, idx], non_zero_distributions[: idx], None)
-        else:
-            distrib_points, counting_weights = np.unique(non_zero_distributions[:, idx], return_counts=True)
-            distance += energy_distance(
-                distrib_points, non_zero_validation_distribution[:, idx], np.prod(counting_weights, prediction_arrays), None
-            )
+    num_of_non_zeros = len(non_zero_where[1])
+    if num_of_non_zeros == 0:
+        pass
+    else:
+        non_zero_distributions = big_prediction_array[non_zero_where]
+        non_zero_validation_distribution = big_validation_array[non_zero_where]
+        for idx in range(non_zero_validation_distribution.shape[1]):
+            if points is not None:
+                distance += energy_distance(points, non_zero_validation_distribution[:, idx], non_zero_distributions[: idx], None)
+            else:
+                distrib_points, counting_weights = np.unique(non_zero_distributions[:, idx], return_counts=True)
+                distance += energy_distance(
+                    distrib_points, non_zero_validation_distribution[:, idx], counting_weights, None
+                )
 
     return distance
 
