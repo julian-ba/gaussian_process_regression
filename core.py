@@ -292,7 +292,7 @@ class _AnalysisSlices:
 
 
 class LargeArrayIterator:
-    def __init__(self, array, grid_shape=None, epsilon:int=0, method:str= "grid"):
+    def __init__(self, array, grid_shape=None, epsilon:int=0, method:str="grid"):
         shape = array.shape
 
         if method == "grid":

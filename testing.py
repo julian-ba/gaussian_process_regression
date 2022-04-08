@@ -1,6 +1,7 @@
-from core import *
 import numpy as np
 import scipy.stats as stats
+
+from core import *
 
 
 def smooth_data(n, loc=0., scale=1.):
@@ -64,9 +65,9 @@ def generate_gaussian_points_with_weights(mean, scale, distribution_representati
         return points, norm(loc=mean_full_size, scale=scale_full_size).pdf(points[:, np.newaxis, np.newaxis])
 
     elif distribution_representation == "cdf":
-        rounded_to_zero = norm(mean, scale).cdf(np.array([[[0.5]]]))
+        rounded_to_zero = norm(mean, scale).cdf(np.array([[0.5]]))
         rounded_to_one = np.ones_like(rounded_to_zero) - rounded_to_zero
-        weights = np.stack(rounded_to_zero, rounded_to_one)
+        weights = np.stack((rounded_to_zero, rounded_to_one))
         return np.array([0, 1]), weights
 
     elif distribution_representation == "samples":
@@ -75,6 +76,28 @@ def generate_gaussian_points_with_weights(mean, scale, distribution_representati
     else:
         raise ValueError("distribution_representation must be \"pdf\", \"cdf\", or \"samples\".")
 
+
+def full_energy_distance(predictions, validations, points=None):
+    from scipy.stats import energy_distance
+    from collections.abc import Sequence
+
+    if not isinstance(validations, Sequence):
+        validations = (validations,)
+    if not isinstance(predictions, Sequence):
+        predictions = (predictions,)
+
+    def energy_distance_1d(_prediction_and_validation):
+        if points is not None:
+            return energy_distance(points, _prediction_and_validation[len(predictions):], _prediction_and_validation[:len(predictions)], None)
+        else:
+            _distrib_points, _counting_weights = np.unique(_prediction_and_validation[len(predictions):], return_counts=True)
+            return energy_distance(_distrib_points, _prediction_and_validation[len(predictions):], _counting_weights, None)
+
+    distance = 0.
+    predictions_and_validations = np.stack(list(predictions)+list(validations))
+    for point in predictions_and_validations[:]:
+        distance += energy_distance_1d(point)
+    return distance
 
 
 def _energy_distance_wrapper_between_gpr_and_validation_1d_according_to_num(num):
@@ -125,31 +148,43 @@ def optimized_cumulative_energy_distance_for_gpr(validation_distributions, gpr_p
     return distance
 
 
-def optimized_cumulative_energy_distance_for_kde(validation_distributions, kde_predictions, scoring_weight=1.) -> float:
+def optimized_cumulative_energy_distance(validation_arrays, prediction_arrays, points:None|np.ndarray=None, scoring_weight=1.) -> float:
     from scipy.stats import energy_distance
-    big_validation_array = np.stack(
-        [np.isclose(validation_distribution, np.zeros_like(validation_distribution))
-         for validation_distribution in validation_distributions]
+    from collections.abc import Sequence
+
+    if not isinstance(validation_arrays, Sequence):
+        validation_arrays = (validation_arrays,)
+    if not isinstance(prediction_arrays, Sequence):
+        prediction_arrays = (prediction_arrays,)
+
+    big_validation_array = np.stack(validation_arrays)
+    zero = np.all(np.isclose(big_validation_array, 0.), axis=0)
+    zero_where = tuple(
+        [slice(None, None, None)] + list(zero.nonzero())
     )
-    zero = np.all(big_validation_array, axis=0)
-    distance = 0.
-    zero_where = tuple([slice(None, None, None)] + list(zero.nonzero()))
-    big_kde_predictions = np.stack(kde_predictions)
     num_of_zeros = len(zero_where[1])
-    points, weights = np.unique(big_kde_predictions[zero_where], return_counts=True)
-    distance += energy_distance(points, [0], weights, None) * num_of_zeros * scoring_weight
-
-
+    big_prediction_array = np.stack(prediction_arrays)
+    distance = 0.
+    if points is not None:
+        distance += energy_distance(points, [0], big_prediction_array[zero_where].sum(axis=1), None)
+    else:
+        distrib_points, counting_weights = np.unique(big_prediction_array[zero_where], return_counts=True)
+        distance += energy_distance(distrib_points, [0], counting_weights, None) * num_of_zeros * scoring_weight
 
     non_zero = np.logical_not(zero)
-    non_zero_where = tuple([slice(None, None, None)] + list(non_zero.nonzero()))
-    non_zero_kde_distributions = big_kde_predictions[non_zero_where]
+    non_zero_where = tuple(
+        [slice(None, None, None)] + list(non_zero.nonzero())
+    )
+    non_zero_distributions = big_prediction_array[non_zero_where]
     non_zero_validation_distribution = big_validation_array[non_zero_where]
     for idx in range(non_zero_validation_distribution.shape[1]):
-        points, weights = np.unique(non_zero_kde_distributions[:, idx], return_counts=True)
-        distance += energy_distance(
-            points, non_zero_validation_distribution[:, idx], weights, None
-        )
+        if points is not None:
+            distance += energy_distance(points, non_zero_validation_distribution[:, idx], non_zero_distributions[: idx], None)
+        else:
+            distrib_points, counting_weights = np.unique(non_zero_distributions[:, idx], return_counts=True)
+            distance += energy_distance(
+                distrib_points, non_zero_validation_distribution[:, idx], np.prod(counting_weights, prediction_arrays), None
+            )
 
     return distance
 
@@ -189,10 +224,6 @@ def cross_val_run(file_names, n, output_image=False):
         output[i, 1] = norm_1(kde, agglomerated_fish)
 
     return output
-
-
-def finite_sum(*array):
-    return np.stack(array).sum(axis=0)
 
 def average(*array):
     return np.average(np.stack(array), axis=0)
@@ -288,7 +319,7 @@ def optimize_kde(file_names, sigma_range:np.ndarray, iterations=10, output=False
             validation_arrays = tuple(
                 import_tif_file(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits2
             )
-            param_score[idx] += optimized_cumulative_energy_distance_for_kde(validation_arrays, kde_predictions, **kwargs)
+            param_score[idx] += optimized_cumulative_energy_distance(validation_arrays, kde_predictions, **kwargs)
     param_score /= iterations
     dtype = np.dtype([("sigma", sigma_range.dtype), ("score", np.dtype(float))])
     return np.array([(sigma_range[idx], param_score[idx]) for idx in range(len(sigma_range))], dtype=dtype)
