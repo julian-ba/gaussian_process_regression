@@ -33,7 +33,7 @@ def _predict_distribution(model, grid):
 
 
 def rbf_regression(
-        *arrays: np.ndarray, threshold=0.15, noise_value=0.2, step=None, evaluate_at=None, considered_at=None, fill="var",
+        *arrays: np.ndarray, threshold=0.15, noise_value=0.2, step=None, evaluate_at=None, considered_at=None, fill="var", include_zeros=True,
         **kwargs
 ) -> tuple:
     from core import Grid, sparsify
@@ -43,7 +43,7 @@ def rbf_regression(
         grid = Grid(shape, step=step)
     else:
         grid = Grid(*evaluate_at, step=step)
-    _x, fx = sparsify(*arrays, threshold=threshold, slices=considered_at, step=step)
+    _x, fx = sparsify(*arrays, threshold=threshold, slices=considered_at, step=step, include_zeros=include_zeros)
     if fx.size == 0:
         if fill == "var":
             fill = noise_value
@@ -53,7 +53,7 @@ def rbf_regression(
         return _predict_distribution(model=rbf_regression_model(_x, fx, noise_value=noise_value, **kwargs), grid=grid)
 
 
-def rbf_regression_over_large_array(*array: np.ndarray, threshold=0.05, lengthscales=1., step=None, it_step=MEMORY_STEP_2D, method:str="fast", **kwargs) -> tuple:
+def rbf_regression_over_large_array(*array: np.ndarray, threshold=0.05, lengthscales=1., step=None, it_step=MEMORY_STEP_2D, method:str="fast", include_zeros=True, **kwargs) -> tuple:
     from core import LargeArrayIterator
     shape = array[0].shape
     assert all([array_i.shape == shape for array_i in array])
@@ -65,16 +65,16 @@ def rbf_regression_over_large_array(*array: np.ndarray, threshold=0.05, lengthsc
             step = np.array(step)
         else:
             step = np.array(1)
-        epsilon = np.ceil(10 * np.power(np.div(lengthscales, step), 2)).astype(np.dtype(int))
+        epsilon = np.ceil(10 * np.power(np.divide(lengthscales, step), 2)).astype(np.dtype(int))
         for i in LargeArrayIterator(array[0], it_step, epsilon=epsilon):
             output_mean[i.evaluate], output_var[i.evaluate] = rbf_regression(
                 *[xi[i.consider] for xi in array], threshold=threshold, step=step, lengthscales=lengthscales,
-                evaluate_at=i.evaluate, considered_at=i.consider, **kwargs
+                evaluate_at=i.evaluate, considered_at=i.consider, include_zeros=include_zeros
             )
 
     elif method == "slow":  # Perfectly accurate
         from core import sparsify, Grid
-        x, fx = sparsify(*array, threshold=threshold, step=step)
+        x, fx = sparsify(*array, threshold=threshold, step=step, include_zeros=include_zeros)
         model = rbf_regression_model(x=x, fx=fx, lengthscales=lengthscales, **kwargs)
 
         for i in LargeArrayIterator(array[0], it_step):

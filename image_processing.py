@@ -1,21 +1,24 @@
 import numpy as np
+from user_values import DATA_DIRECTORY
+from os import listdir, path
 
 
-def import_tif_file(*file_name: str, dtype=None, zoom=False, **kwargs) -> np.ndarray | tuple:
+def import_tif_files(directory: str = DATA_DIRECTORY, dtype=None, zoom=False, **kwargs) -> np.ndarray | tuple:
     from tifffile import imread
-    if len(file_name) == 1:
-        image = imread(*file_name, **kwargs)
+    from scipy.ndimage import zoom as scipy_zoom
+
+    images_filenames = [path.join(directory, filename_i) for filename_i in listdir(path=directory)]
+    if len(images_filenames) == 1:
+        image = imread(images_filenames[0], **kwargs)
         if zoom:
-            from scipy.ndimage import zoom as scipy_zoom
             image = scipy_zoom(image, zoom)
         if dtype is None:
-            return image
-        else:
             return image.astype(dtype)
+        else:
+            return image
     else:
-        image = [imread(file_name_i, **kwargs) for file_name_i in file_name]
+        image = [imread(filename_i, **kwargs) for filename_i in images_filenames]
         if zoom:
-            from scipy.ndimage import zoom as scipy_zoom
             image = [scipy_zoom(image_i, zoom) for image_i in image]
         if dtype is None:
             return tuple(image_i.astype(dtype) for image_i in image)
@@ -29,20 +32,4 @@ def export_tif_file(file_name: str, array: np.ndarray, dtype=None, **kwargs) -> 
     if dtype is None:
         dtype = array.dtype
 
-    imwrite(file_name + ".tif", array.astype(dtype), **kwargs)
-
-
-def find_minimal_shape(*array) -> tuple:
-    shapes = np.stack([np.array(_array.shape) for _array in array])
-    minimal_shape = np.amin(shapes, axis=0)
-    return tuple(minimal_shape)
-
-
-def array_crops(*array) -> tuple:
-    shape = np.array(find_minimal_shape(*array))
-    shapes = [i.shape for i in array]
-    image_slices = []
-    for _shape in shapes:
-        q, r = np.divmod(np.array(_shape) - shape, 2, dtype=int)
-        image_slices.append(tuple(slice(q[i], _shape[i]-q[i]-r[i]) for i in range(len(q))))
-    return tuple(image_slices)
+    imwrite(file_name, array.astype(dtype), **kwargs)

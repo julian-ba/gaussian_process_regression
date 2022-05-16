@@ -19,6 +19,25 @@ def exactly_2d(*array: np.ndarray) -> np.ndarray | tuple:
         return tuple(_exactly_2d(array_i) for array_i in array)
 
 
+def find_minimal_shape(*array) -> tuple:
+    shapes = np.stack([np.array(_array.shape) for _array in array])
+    minimal_shape = np.amin(shapes, axis=0)
+    return tuple(minimal_shape)
+
+
+def array_crops(*array, shape=None) -> tuple:
+    if shape is not None:
+        minimal_shape = np.array(find_minimal_shape(*array, np.empty(shape)))
+    else:
+        minimal_shape = np.array(find_minimal_shape(*array))
+    shapes = [i.shape for i in array]
+    image_slices = []
+    for _shape in shapes:
+        q, r = np.divmod(np.array(_shape) - minimal_shape, 2, dtype=int)
+        image_slices.append(tuple(slice(q[i], _shape[i]-q[i]-r[i]) for i in range(len(q))))
+    return tuple(image_slices)
+
+
 class Grid:
     def convert_to_coordinates(self, step=None):
         if step is None:
@@ -243,7 +262,7 @@ def sparsify(
         indices = tuple(np.nonzero(array_i >= threshold) for array_i in array)
         sparse_fx = np.concatenate(tuple(exactly_2d(array[idx][indices[idx]]) for idx in range(len(array))))
         if slices is None:
-            grids = (Grid(array[i].shape, step=step) for i in range(len(array)))
+            grids = tuple(Grid(array[i].shape, step=step) for i in range(len(array)))
         else:
             grids = [Grid(*slices, step=step)] * len(array)
 
