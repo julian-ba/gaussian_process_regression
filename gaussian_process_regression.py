@@ -4,7 +4,7 @@ from user_values import MEMORY_STEP_2D
 
 
 
-def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., data_type=np.float32, noise_value=None) -> gpflow.models.GPModel:
+def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., data_type=np.float32, noise_value=None, do_optimization=True) -> gpflow.models.GPModel:
     import tensorflow as tf
     from core import exactly_2d
     from numpy import amax, abs
@@ -20,10 +20,11 @@ def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., varianc
         )
         rbf_model.likelihood.variance.assign(noise_value)
 
-        gpflow.set_trainable(rbf_model.kernel.lengthscales, False)
+        if do_optimization:
+            gpflow.set_trainable(rbf_model.kernel.lengthscales, False)
 
-        opti = tf.optimizers.Adam()
-        opti.minimize(rbf_model.training_loss, rbf_model.trainable_variables)
+            opti = tf.optimizers.Adam()
+            opti.minimize(rbf_model.training_loss, rbf_model.trainable_variables)
 
     return rbf_model
 
