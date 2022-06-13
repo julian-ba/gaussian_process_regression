@@ -11,8 +11,6 @@ def _exactly_2d(array):
 
 
 def exactly_2d(*array: np.ndarray) -> np.ndarray | tuple:
-    # Warning: This function does not necessarily behave as expected with arrays of dimension greater than 2. In this
-    # case, it should only be used carefully.
     if len(array) == 1:
         return _exactly_2d(array[0])
     else:

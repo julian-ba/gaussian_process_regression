@@ -1,26 +1,29 @@
-import gpflow.models
+import gpflow
 import numpy as np
 from user_values import MEMORY_STEP_2D
 
 
-def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., noise_value=None) -> gpflow.models.GPModel:
-    from gpflow import models, kernels, optimizers, set_trainable
+
+def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., data_type=np.float32, noise_value=None) -> gpflow.models.GPModel:
+    import tensorflow as tf
     from core import exactly_2d
     from numpy import amax, abs
-    x, fx = exactly_2d(x, fx)
 
-    if noise_value is None:
-        noise_value = amax(abs(fx), initial=1e-20) * 0.2
-    rbf_model = models.GPR(
-        data=(x, fx),
-        kernel=kernels.stationaries.SquaredExponential(variance=variance, lengthscales=lengthscales),
-    )
-    rbf_model.likelihood.variance.assign(noise_value)
+    with gpflow.config.as_context(temporary_config=gpflow.config.Config(float=np.float32)):
+        x, fx = exactly_2d(x.astype(dtype=data_type), fx.astype(dtype=data_type))
 
-    set_trainable(rbf_model.kernel.lengthscales, False)
+        if noise_value is None:
+            noise_value = amax(abs(fx), initial=1e-20) * 0.2
+        rbf_model = gpflow.models.GPR(
+            data=(x, fx),
+            kernel=gpflow.kernels.stationaries.SquaredExponential(variance=variance, lengthscales=lengthscales),
+        )
+        rbf_model.likelihood.variance.assign(noise_value)
 
-    opti = optimizers.Scipy()
-    opti.minimize(rbf_model.training_loss, variables=rbf_model.trainable_variables)
+        gpflow.set_trainable(rbf_model.kernel.lengthscales, False)
+
+        opti = tf.optimizers.Adam()
+        opti.minimize(rbf_model.training_loss, rbf_model.trainable_variables)
 
     return rbf_model
 

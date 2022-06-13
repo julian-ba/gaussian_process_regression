@@ -54,6 +54,15 @@ def norm_1(x, y):
     return np.sum(np.abs(x - y))
 
 
+def generate_gaussian_samples(mean, scale, num:int=1):
+    if num == 1:
+        return stats.norm.rvs(mean, scale)
+    else:
+        output = []
+        for i in range(num):
+            output.append(stats.norm.rvs(mean, scale))
+        return tuple(output)
+
 def generate_gaussian_points_with_weights(mean, scale, distribution_representation="pdf", num=5):
     from scipy.stats import norm
     if distribution_representation == "pdf":
@@ -70,11 +79,8 @@ def generate_gaussian_points_with_weights(mean, scale, distribution_representati
         weights = np.stack((rounded_to_zero, rounded_to_one))
         return np.array([0, 1]), weights
 
-    elif distribution_representation == "samples":
-        raise NotImplementedError
-
     else:
-        raise ValueError("distribution_representation must be \"pdf\", \"cdf\", or \"samples\".")
+        raise ValueError("distribution_representation must be \"pdf\", or \"cdf\".")
 
 
 def full_energy_distance(predictions, validations, points=None):
@@ -82,9 +88,9 @@ def full_energy_distance(predictions, validations, points=None):
     from collections.abc import Sequence
 
     if not isinstance(validations, Sequence):
-        validations = (validations,)
+        validations = tuple(validations)
     if not isinstance(predictions, Sequence):
-        predictions = (predictions,)
+        predictions = tuple(predictions)
 
     def energy_distance_1d(_prediction_and_validation):
         if points is not None:
@@ -160,7 +166,8 @@ def optimize_parameters(
         file_names, optimize_func, distance, var_kwargs,
         const_kwargs=None, agglomeration_func=average, iterations=10, output=False, normalize=False
 ):
-    from image_processing import array_crops, import_tif_files, export_tif_file
+    from image_processing import import_tif_files, export_tif_file
+    from core import array_crops
     from tqdm import tqdm
     if const_kwargs is None:
         const_kwargs = {}
@@ -203,8 +210,9 @@ def optimize_parameters(
 
 def optimize_gpr(file_names, lengthscales_range:np.ndarray, iterations=10, output=True, **kwargs):
     # A modified optimization run, specifically for optimizing the lengthscales parameter in GPR
-    from image_processing import array_crops, import_tif_files, export_tif_file
+    from image_processing import import_tif_files, export_tif_file
     from gaussian_process_regression import rbf_regression_over_large_array
+    from core import array_crops
     from tqdm import trange
     param_score = np.zeros(len(lengthscales_range))
     image_crops = array_crops(*import_tif_files(*file_names))
@@ -228,9 +236,10 @@ def optimize_gpr(file_names, lengthscales_range:np.ndarray, iterations=10, outpu
 
 def optimize_kde(file_names, sigma_range:np.ndarray, iterations=10, output=False, **kwargs):
     # A modified optimization run, specifically for optimizing the sigma parameter in KDE
-    from image_processing import array_crops, import_tif_files, export_tif_file
+    from image_processing import import_tif_files, export_tif_file
     from kernel_density_estimation import gaussian_kernel_density_estimation
     from tqdm import trange
+    from core import array_crops
     param_score = np.zeros(len(sigma_range))
     ffish_crops = array_crops(*import_tif_files(*file_names))
     middle_z = [(i[0].stop - i[0].start) // 2 for i in ffish_crops]
