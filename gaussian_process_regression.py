@@ -4,13 +4,13 @@ from user_values import MEMORY_STEP_2D
 
 
 
-def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., data_type=np.float32, noise_value=None, do_optimization=True) -> gpflow.models.GPModel:
+def rbf_regression_model(x: np.ndarray, fx: np.ndarray, lengthscales=1., variance=1., float_type=np.float32, noise_value=None, do_optimization=True) -> gpflow.models.GPModel:
     import tensorflow as tf
     from core import exactly_2d
     from numpy import amax, abs
 
     with gpflow.config.as_context(temporary_config=gpflow.config.Config(float=np.float32)):
-        x, fx = exactly_2d(x.astype(dtype=data_type), fx.astype(dtype=data_type))
+        x, fx = exactly_2d(x.astype(dtype=float_type), fx.astype(dtype=float_type))
 
         if noise_value is None:
             noise_value = amax(abs(fx), initial=1e-20) * 0.2

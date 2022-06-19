@@ -3,7 +3,7 @@ from user_values import DATA_DIRECTORY
 from os import listdir, path
 
 
-def import_tif_files(directory: str = DATA_DIRECTORY, dtype=None, zoom=False, **kwargs) -> tuple:
+def import_tif_files(directory: str = DATA_DIRECTORY, dtype=None, zoom=False, **kwargs) -> np.ndarray | tuple:
     from tifffile import imread
     from scipy.ndimage import zoom as scipy_zoom
 
