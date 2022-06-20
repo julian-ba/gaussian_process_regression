@@ -1,4 +1,3 @@
-import numpy as np
 import scipy.stats as stats
 
 from core import *
@@ -28,28 +27,6 @@ def jagged_data(n, loc=0., scale=1) -> np.ndarray:
     return array
 
 
-def generate_splits(number_of_splits, array):
-    # Probably could be handled more efficiently
-    internal_array = array.copy()
-    q, r = np.divmod(len(internal_array), number_of_splits)
-    list_of_splits = []
-    for i in range(number_of_splits):
-        indices_array = np.empty(q + min(max(0, r), 1))
-        with np.nditer(indices_array, op_flags=["readwrite"]) as it:
-            for j in it:
-                index_to_pop = np.random.randint(0, len(internal_array))
-                j[...] = internal_array[index_to_pop]
-                internal_array = np.delete(internal_array, index_to_pop)
-        list_of_splits.append(indices_array.astype(np.dtype("uint16")))
-        r -= 1
-
-    return tuple(list_of_splits)
-
-
-def random_indices(number_of_splits, upper_index):
-    return generate_splits(number_of_splits, np.arange(upper_index))
-
-
 def norm_1(x, y):
     return np.sum(np.abs(x - y))
 
@@ -62,6 +39,7 @@ def generate_gaussian_samples(mean, scale, num:int=1):
         for i in range(num):
             output.append(stats.norm.rvs(mean, scale))
         return tuple(output)
+
 
 def generate_gaussian_points_with_weights(mean, scale, distribution_representation="pdf", num=5):
     from scipy.stats import norm
@@ -166,7 +144,7 @@ def optimize_parameters(
         file_names, optimize_func, distance, var_kwargs,
         const_kwargs=None, agglomeration_func=average, iterations=10, output=False, normalize=False
 ):
-    from image_processing import import_tif_files, export_tif_file
+    from file_processing import import_tif_file, export_tif_file
     from core import array_crops
     from tqdm import tqdm
     if const_kwargs is None:
@@ -175,7 +153,7 @@ def optimize_parameters(
     values = list(var_kwargs.values())
     grid = Grid(values)
     param_score = np.zeros(len(grid))
-    ffish_crops = array_crops(*import_tif_files(*file_names))
+    ffish_crops = array_crops(*import_tif_file(*file_names))
     middle_z = [(i[0].stop - i[0].start) // 2 for i in ffish_crops]
     num = 0
     lst = grid.get_list()
@@ -185,14 +163,14 @@ def optimize_parameters(
         for j in range(iterations):
             splits1, splits2 = random_indices(2, len(file_names))
             prediction = optimize_func(
-            *[import_tif_files(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits1],
+            *[import_tif_file(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits1],
             **kwargs_i
             )
             if output and (j==0):
                 export_tif_file(f"figures/optimization_{optimize_func.__name__}({num})", prediction)
 
             agglomerated_image = agglomeration_func(
-                *[import_tif_files(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits2]
+                *[import_tif_file(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits2]
             )
 
             if normalize:
@@ -210,22 +188,22 @@ def optimize_parameters(
 
 def optimize_gpr(file_names, lengthscales_range:np.ndarray, iterations=10, output=True, **kwargs):
     # A modified optimization run, specifically for optimizing the lengthscales parameter in GPR
-    from image_processing import import_tif_files, export_tif_file
+    from file_processing import import_tif_file, export_tif_file
     from gaussian_process_regression import rbf_regression_over_large_array
     from core import array_crops
     from tqdm import trange
     param_score = np.zeros(len(lengthscales_range))
-    image_crops = array_crops(*import_tif_files(*file_names))
+    image_crops = array_crops(*import_tif_file(*file_names))
     middle_z = [(i[0].stop - i[0].start) // 2 for i in image_crops]
     for idx in trange(len(lengthscales_range)):
         for num in range(iterations):
             splits1, splits2 = random_indices(2, len(file_names))
-            testing_arrays = tuple(import_tif_files(file_names[k], key=middle_z[k])[image_crops[k][1:]] for k in splits1)
+            testing_arrays = tuple(import_tif_file(file_names[k], key=middle_z[k])[image_crops[k][1:]] for k in splits1)
             prediction_gpr = rbf_regression_over_large_array(*testing_arrays, lengthscales=lengthscales_range[idx], method="slow")
             if output and (num == 0):
                 export_tif_file(f"figures/output_gpr({idx})", prediction_gpr[0])
             validation_arrays = tuple(
-                import_tif_files(file_names[k], key=middle_z[k])[image_crops[k][1:]] for k in splits2
+                import_tif_file(file_names[k], key=middle_z[k])[image_crops[k][1:]] for k in splits2
             )
             param_score[idx] += optimized_cumulative_energy_distance_for_gpr(validation_arrays, prediction_gpr, **kwargs)
     param_score /= iterations
@@ -236,24 +214,24 @@ def optimize_gpr(file_names, lengthscales_range:np.ndarray, iterations=10, outpu
 
 def optimize_kde(file_names, sigma_range:np.ndarray, iterations=10, output=False, **kwargs):
     # A modified optimization run, specifically for optimizing the sigma parameter in KDE
-    from image_processing import import_tif_files, export_tif_file
+    from file_processing import import_tif_file, export_tif_file
     from kernel_density_estimation import gaussian_kernel_density_estimation
     from tqdm import trange
     from core import array_crops
     param_score = np.zeros(len(sigma_range))
-    ffish_crops = array_crops(*import_tif_files(*file_names))
+    ffish_crops = array_crops(*import_tif_file(*file_names))
     middle_z = [(i[0].stop - i[0].start) // 2 for i in ffish_crops]
     for idx in trange(len(sigma_range)):
         for num in range(iterations):
             splits1, splits2 = random_indices(2, len(file_names))
-            testing_arrays = tuple(import_tif_files(file_names[k], key=middle_z[k], dtype=np.dtype(float))[ffish_crops[k][1:]] for k in splits1)
+            testing_arrays = tuple(import_tif_file(file_names[k], key=middle_z[k], dtype=np.dtype(float))[ffish_crops[k][1:]] for k in splits1)
             kde_predictions = [
                 gaussian_kernel_density_estimation(testing_array, sigma_range[idx]) for testing_array in testing_arrays
             ]
             if output and (num == 0):
                 export_tif_file(f"figures/output_kde({idx})", kde_predictions[0])
             validation_arrays = tuple(
-                import_tif_files(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits2
+                import_tif_file(file_names[k], key=middle_z[k])[ffish_crops[k][1:]] for k in splits2
             )
             param_score[idx] += optimized_cumulative_energy_distance(validation_arrays, kde_predictions, **kwargs)
     param_score /= iterations

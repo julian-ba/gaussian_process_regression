@@ -1,5 +1,8 @@
 # Convenience functions
 import numpy as np
+from file_processing import import_if_str
+from typing import Tuple
+
 
 def _exactly_2d(array):
     if array.ndim <= 1:
@@ -184,7 +187,6 @@ class Grid:
             self._num += 1
             return self._list[old_num]
 
-
     def get_axis(self, *i, dtype=None):
         if self.indexable:
             if len(i) == 1:
@@ -235,16 +237,20 @@ def shape_from_slice(*slice_i:slice) -> tuple:
     return tuple(i.stop - i.start for i in slice_i)
 
 
+def combine_non_zeros(*non_zeroes):
+    non_zeroes_stacked = np.concatenate([np.vstack(non_zero) for non_zero in non_zeroes], axis=1)
+    return tuple(np.vsplit(np.unique(non_zeroes_stacked, axis=1), len(non_zeroes[0])))
+
+
 def sparsify(
-        *array:np.ndarray,
-        threshold=0.05, slices: None | tuple=None, step: None | tuple=None, include_zeros:bool=True,
+        *array: np.ndarray | str,
+        threshold=0.05, slices: None | tuple = None, step: None | tuple = None, include_zeros: bool = True,
         dtype_sparse_coordinates=np.dtype(float), dtype_sparse_fx=np.dtype(float)
 ):
     # From an array, return a list of coordinates, and a list of values corresponding to the coordinates, where all the
     # values are greater than threshold.
-    assert isinstance(include_zeros, bool), "include_zeros MUST be bool."
     if include_zeros:
-        indices = np.nonzero(np.any(np.stack(array) >= threshold, axis=0))
+        indices = combine_non_zeros(*[import_if_str(array_i).nonzero() for array_i in array])
         sparse_fx = np.concatenate([array_i[indices] for array_i in array])
         if dtype_sparse_fx is not None:
             sparse_fx = sparse_fx.astype(dtype_sparse_fx)
@@ -254,25 +260,25 @@ def sparsify(
         else:
             grid = Grid(*slices, step=step)
 
-        sparse_coords = np.concatenate([grid.get_array(dtype_sparse_coordinates)[indices]] * len(array))
-        return sparse_coords, sparse_fx
+        sparse_coordinates = np.concatenate([grid.get_array(dtype_sparse_coordinates)[indices]] * len(array))
+        return sparse_coordinates, sparse_fx
     else:
-        indices = tuple(np.nonzero(array_i >= threshold) for array_i in array)
-        sparse_fx = np.concatenate(tuple(exactly_2d(array[idx][indices[idx]]) for idx in range(len(array))))
+        indices = tuple(np.nonzero(import_if_str(array_i) >= threshold) for array_i in array)
+        sparse_fx = np.concatenate(tuple(exactly_2d(import_if_str(array[idx])[indices[idx]]) for idx in range(len(array))))
         if slices is None:
             grids = tuple(Grid(array[i].shape, step=step) for i in range(len(array)))
         else:
             grids = [Grid(*slices, step=step)] * len(array)
 
-        sparse_coords = np.concatenate(tuple(grids[idx].get_array()[indices[idx]] for idx in range(len(grids))))
+        sparse_coordinates = np.concatenate(tuple(grids[idx].get_array()[indices[idx]] for idx in range(len(grids))))
 
         if dtype_sparse_coordinates is not None:
-            sparse_coords = sparse_coords.astype(dtype_sparse_coordinates)
+            sparse_coordinates = sparse_coordinates.astype(dtype_sparse_coordinates)
 
         if dtype_sparse_fx is not None:
             sparse_fx = sparse_fx.astype(dtype_sparse_fx)
 
-        return sparse_coords, sparse_fx
+        return sparse_coordinates, sparse_fx
 
 
 class _AnalysisSlices:
@@ -309,20 +315,23 @@ class _AnalysisSlices:
 
 
 class LargeArrayIterator:
-    def __init__(self, array, grid_shape=None, epsilon:int=0, method:str="grid"):
-        shape = array.shape
+    def __init__(self, array: Tuple[int, ...] | np.ndarray, grid_shape=None, epsilon: int = 0, method: str = "grid"):
+        if isinstance(array, np.ndarray):
+            shape = array.shape
+        else:
+            shape = array
 
         if method == "grid":
             index_lookup_table = []
             if grid_shape is None:
-                grid_shape = tuple(np.ceil(np.array(array.shape) / 10).astype(np.dtype(int)))
+                grid_shape = tuple(np.ceil(np.array(shape) / 10).astype(np.dtype(int)))
             assert np.all(grid_shape)
             grid_shape = np.broadcast_to(grid_shape, array.ndim)
             for dim in range(array.ndim):
                 index_lookup_table.append(
                     np.append(np.arange(0, shape[dim] - 1, grid_shape[dim], dtype=int), shape[dim]))
-            self.indices_lower = Grid(*[coords[:-1] for coords in index_lookup_table]).get_list()
-            self.indices_upper = Grid(*[coords[1:] for coords in index_lookup_table]).get_list()
+            self.indices_lower = Grid(*[coordinates[:-1] for coordinates in index_lookup_table]).get_list()
+            self.indices_upper = Grid(*[coordinates[1:] for coordinates in index_lookup_table]).get_list()
 
             if np.any(epsilon):
                 self.considered_lower = np.maximum(self.indices_lower - epsilon, 0)
@@ -337,6 +346,16 @@ class LargeArrayIterator:
     def __len__(self):
         return len(self.indices_lower)
 
+    def __getitem__(self, item: int):
+        if item > len(self):
+            raise ValueError
+        return _AnalysisSlices(
+            lower_evaluate=self.indices_lower[item],
+            upper_evaluate=self.indices_upper[item],
+            lower_consider=self.considered_lower[item],
+            upper_consider=self.considered_upper[item]
+        )
+
     def __iter__(self):
         self._slice_num = 0
         self._stop = len(self.indices_lower)
@@ -348,19 +367,26 @@ class LargeArrayIterator:
         else:
             old_slice_num = self._slice_num
             self._slice_num += 1
-            return _AnalysisSlices(
-                lower_evaluate=self.indices_lower[old_slice_num],
-                upper_evaluate=self.indices_upper[old_slice_num],
-                lower_consider=self.considered_lower[old_slice_num],
-                upper_consider=self.considered_upper[old_slice_num]
-            )
+            return self.__getitem__(old_slice_num)
 
-    def __getitem__(self, item:int):
-        if item > len(self):
-            raise ValueError
-        return _AnalysisSlices(
-            lower_evaluate=self.indices_lower[item],
-            upper_evaluate=self.indices_upper[item],
-            lower_consider=self.considered_lower[item],
-            upper_consider=self.considered_upper[item]
-        )
+
+def generate_splits(number_of_splits, array):
+    # Probably could be handled more efficiently
+    internal_array = array.copy()
+    q, r = np.divmod(len(internal_array), number_of_splits)
+    list_of_splits = []
+    for i in range(number_of_splits):
+        indices_array = np.empty(q + min(max(0, r), 1))
+        with np.nditer(indices_array, op_flags=["readwrite"]) as it:
+            for j in it:
+                index_to_pop = np.random.randint(0, len(internal_array))
+                j[...] = internal_array[index_to_pop]
+                internal_array = np.delete(internal_array, index_to_pop)
+        list_of_splits.append(indices_array.astype(np.dtype("uint16")))
+        r -= 1
+
+    return tuple(list_of_splits)
+
+
+def random_indices(number_of_splits, upper_index):
+    return generate_splits(number_of_splits, np.arange(upper_index))
